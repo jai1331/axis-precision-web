@@ -63,6 +63,33 @@ const operatorsList = Array.from({ length: 100 }, (_, i) => {
   return `Emp${cnt}${num}`;
 });
 
+// Add time formatting helpers (from ProductionRecordModal)
+function toAmPmString(dateStr: string, timeStr: string) {
+  // dateStr: 'YYYY-MM-DD', timeStr: 'HH:MM' (24h)
+  if (!dateStr || !timeStr) return '';
+  const [hourStr, minuteStr] = timeStr.split(':');
+  let hour = parseInt(hourStr, 10);
+  const minute = minuteStr;
+  let period = 'AM';
+  if (hour >= 12) {
+    period = 'PM';
+    if (hour > 12) hour -= 12;
+  } else if (hour === 0) {
+    hour = 12;
+  }
+  return `${hour.toString().padStart(2, '0')}:${minute}:${period}`;
+}
+
+function fromAmPmString(dateStr: string, ampmStr: string) {
+  // ampmStr: 'HH:MM:AM' or 'HH:MM:PM', returns 'YYYY-MM-DDTHH:MM'
+  if (!dateStr || !ampmStr) return '';
+  const [hourStr, minuteStr, period] = ampmStr.split(':');
+  let hour = parseInt(hourStr, 10);
+  if (period?.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+  if (period?.toUpperCase() === 'AM' && hour === 12) hour = 0;
+  return `${dateStr}T${hour.toString().padStart(2, '0')}:${minuteStr}`;
+}
+
 export default function EmployeeEntryForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerAdminEntry, setCustomerList] = useState<any[]>([]);
@@ -76,6 +103,10 @@ export default function EmployeeEntryForm() {
   const [formValues, setFormValues] = useState<any>({});
   const router = useRouter();
   const { toast } = useToast();
+
+  // Add state for time pickers
+  const [startTimeInput, setStartTimeInput] = useState('');
+  const [endTimeInput, setEndTimeInput] = useState('');
 
   const defaultValues: FormValues = {
     operatorName: 'Emp001',
@@ -109,6 +140,20 @@ export default function EmployeeEntryForm() {
   useEffect(() => {
     fetchCustomer();
   }, []);
+
+  // On form load, set picker values from defaultValues
+  useEffect(() => {
+    const date = form.getValues('date');
+    setStartTimeInput(fromAmPmString(date, form.getValues('startTime')));
+    setEndTimeInput(fromAmPmString(date, form.getValues('endTime')));
+  }, []);
+
+  // When date changes, update time pickers
+  useEffect(() => {
+    const date = form.getValues('date');
+    setStartTimeInput(fromAmPmString(date, form.getValues('startTime')));
+    setEndTimeInput(fromAmPmString(date, form.getValues('endTime')));
+  }, [form.watch('date')]);
 
   // Check if entered quantity exceeds available quantity
   useEffect(() => {
@@ -303,22 +348,22 @@ export default function EmployeeEntryForm() {
     setLoader(true);
     
     try {
-            const url = showUpdateBtn
-        ? '/api/updateEmployeeForm'
-        : '/api/employeeForm';
-      
-      const method = showUpdateBtn ? 'PUT' : 'POST';
-      
-      const payload = showUpdateBtn 
-        ? { ...formValues, id: showUpdateBtn }
-        : formValues;
+      // Convert date to ISO format
+      const isoDate = new Date(formValues.date).toISOString();
 
-      const response = await fetch(url, {
-        method,
+      // Prepare payload
+      const payload = {
+        ...formValues,
+        date: isoDate,
+        ...(showUpdateBtn ? { id: showUpdateBtn } : {}),
+      };
+
+      const response = await fetch('/api/employeeForm', {
+        method: showUpdateBtn ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload), 
       });
 
       if (!response.ok) {
@@ -748,9 +793,17 @@ export default function EmployeeEntryForm() {
                   name="startTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-semibold">Start Time - "HH:MM:AM"</FormLabel>
+                      <FormLabel className="text-base font-semibold">Start Time</FormLabel>
                       <FormControl>
-                        <Input placeholder="01:00:AM" className="h-12" {...field} />
+                        <Input
+                          type="time"
+                          value={startTimeInput.split('T')[1] || ''}
+                          onChange={e => {
+                            setStartTimeInput(`${form.getValues('date')}T${e.target.value}`);
+                            field.onChange(toAmPmString(form.getValues('date'), e.target.value));
+                          }}
+                          className="h-12"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -763,9 +816,17 @@ export default function EmployeeEntryForm() {
                   name="endTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-semibold">End Time - "HH:MM:PM"</FormLabel>
+                      <FormLabel className="text-base font-semibold">End Time</FormLabel>
                       <FormControl>
-                        <Input placeholder="01:00:PM" className="h-12" {...field} />
+                        <Input
+                          type="time"
+                          value={endTimeInput.split('T')[1] || ''}
+                          onChange={e => {
+                            setEndTimeInput(`${form.getValues('date')}T${e.target.value}`);
+                            field.onChange(toAmPmString(form.getValues('date'), e.target.value));
+                          }}
+                          className="h-12"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
