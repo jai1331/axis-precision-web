@@ -8,14 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 
 // Web-oriented utils that replicate React Native util.js functionality
 
-// Server URL - use production backend server
-const serverURL = 'https://axis-precision-app.onrender.com';
-
-// Use proxy routes in development to bypass CORS, direct API in production
-const isDevelopment = process.env.NODE_ENV === 'development';
-const baseURL = isDevelopment ? '' : serverURL;
-
-
+// Remove serverURL and baseURL logic
+// All API calls should use relative URLs
 
 // Authentication functions
 export const doLogin = async (username: string, password: string) => {
@@ -35,7 +29,7 @@ export const doLogin = async (username: string, password: string) => {
   };
 
   try {
-    const response = await fetch(`${baseURL}/api/login`, requestOptions);
+    const response = await fetch(`/api/login`, requestOptions);
     const result = await response.json();
     
     if (result.status === 'ok') {
@@ -70,7 +64,7 @@ export const saveAdminEntryForm = async (values: any, FETCH_TYPE: string = 'save
   };
 
   try {
-    const response = await fetch(`${baseURL}/api/${FETCH_TYPE}`, requestOptions);
+    const response = await fetch(`/api/${FETCH_TYPE}`, requestOptions);
     const result = await response.json();
     
     if (result.status === 'ok') {
@@ -83,10 +77,10 @@ export const saveAdminEntryForm = async (values: any, FETCH_TYPE: string = 'save
   }
 };
 
-// Get employee data - matches React Native exactly
+// Get employee data
 export const getEmployeeData = async (startDate: string, endDate: string) => {
   try {
-    const response = await fetch(`${baseURL}/api/getEmployeeData?startDate=${startDate}&endDate=${endDate}`);
+    const response = await fetch(`/api/getEmployeeData?startDate=${startDate}&endDate=${endDate}`);
     const body = await response.json();
     if (response.status !== 200) throw Error(body.message);
     return body;
@@ -96,10 +90,10 @@ export const getEmployeeData = async (startDate: string, endDate: string) => {
   }
 };
 
-// Get customer list - matches React Native exactly
+// Get customer list
 export const getCustomerList = async () => {
   try {
-    const response = await fetch(`${baseURL}/api/getCustomerList`);
+    const response = await fetch(`/api/getCustomerList`);
     const body = await response.json();
     if (response.status !== 200) throw Error(body.message);
     return body;
@@ -127,7 +121,7 @@ export const updateAdmitEntryForm = async (values: any, _id: string, type: strin
   if (type === "employee") urlType = 'updateEmployeeForm';
   
   try {
-    const response = await fetch(`${baseURL}/api/${urlType}`, requestOptions);
+    const response = await fetch(`/api/${urlType}`, requestOptions);
     const body = await response.json();
     if (response.status !== 200) throw Error(body.message);
     return body;
@@ -454,7 +448,7 @@ export const formatDate = (date: Date) => {
 // Download summary in Excel - matches React Native
 export const downloadSummaryInExcel = async (startDate: string, endDate: string) => {
   try {
-    const response = await fetch(`${baseURL}/api/downloadExcel?startDate=${startDate}&endDate=${endDate}`);
+    const response = await fetch(`/api/downloadExcel?startDate=${startDate}&endDate=${endDate}`);
     if (response.ok) {
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -473,8 +467,8 @@ export const downloadSummaryInExcel = async (startDate: string, endDate: string)
 
 // Export all functions
 export {
-  serverURL,
-  baseURL
+  // serverURL,
+  // baseURL
 };
 
 // Component and customer data from legacy code
