@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
+
 export async function GET(request: NextRequest) {
   try {
     const apiUrl = 'https://axis-precision-app.onrender.com/api/employeeForm';
@@ -18,12 +29,16 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (error) {
     console.error('Proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch employee form data' },
-      { status: 500 }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 }
@@ -48,17 +63,21 @@ export async function POST(request: NextRequest) {
       console.error('Production server error:', errorText);
       return NextResponse.json(
         { error: 'Failed to save employee form' },
-        { status: response.status }
+        { status: response.status, headers: { "Access-Control-Allow-Origin": "*" } }
       );
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (error) {
     console.error('Proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to save employee form' },
-      { status: 500 }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 } 
@@ -83,17 +102,21 @@ export async function PUT(request: NextRequest) {
       console.error('Production server error:', errorText);
       return NextResponse.json(
         { error: 'Failed to update employee form' },
-        { status: response.status }
+        { status: response.status, headers: { "Access-Control-Allow-Origin": "*" } }
       );
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (error) {
     console.error('Proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to update employee form' },
-      { status: 500 }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 } 

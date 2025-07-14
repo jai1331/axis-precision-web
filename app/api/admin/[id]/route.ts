@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,PUT,DELETE,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -21,12 +32,16 @@ export async function GET(
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (error) {
     console.error('Proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch admin data' },
-      { status: 500 }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 }
@@ -54,17 +69,21 @@ export async function PUT(
       console.error('Production server error:', errorText);
       return NextResponse.json(
         { error: 'Failed to update admin data' },
-        { status: response.status }
+        { status: response.status, headers: { "Access-Control-Allow-Origin": "*" } }
       );
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (error) {
     console.error('Proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to update admin data' },
-      { status: 500 }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 }
@@ -90,12 +109,16 @@ export async function DELETE(
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (error) {
     console.error('Proxy error:', error);
     return NextResponse.json(
       { error: 'Failed to delete admin data' },
-      { status: 500 }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 } 
