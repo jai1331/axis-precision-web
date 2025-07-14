@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { AdminEntry } from '../../types';
 
-export interface AdminEntryDocument extends AdminEntry, Document {}
+export interface AdminEntryDocument extends Omit<AdminEntry, '_id'>, Document {}
 
 const AdminEntrySchema: Schema = new Schema(
   {

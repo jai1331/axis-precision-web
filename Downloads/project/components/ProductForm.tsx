@@ -130,8 +130,8 @@ export default function ProductForm({ initialData }: ProductFormProps = {}) {
       const data = await response.json();
       
       // Extract unique customers and components
-      const uniqueCustomers = [...new Set(data.map((item: any) => item.customerName as string))];
-      const uniqueComponents = [...new Set(data.map((item: any) => item.componentName as string))];
+      const uniqueCustomers = [...new Set(data.map((item: any) => String(item.customerName)))] as string[];
+      const uniqueComponents = [...new Set(data.map((item: any) => String(item.componentName)))] as string[];
       
       // Generate operators list (Emp001 to Emp100)
       const operators = Array.from({ length: 100 }, (_, i) => {

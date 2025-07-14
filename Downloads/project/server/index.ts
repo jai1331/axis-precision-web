@@ -388,9 +388,8 @@ app.get('/api/downloadExcel', async (req: Request, res: Response) => {
     
     if (response) {
       console.log('response', response.length);
-      var temp = JSON.stringify(response);
-      temp = JSON.parse(temp);
-      var ws = XLSX.utils.json_to_sheet(temp);
+      // Remove JSON.stringify/parse, pass response directly
+      var ws = XLSX.utils.json_to_sheet(response);
       var down = path.join(__dirname, 'exportdata.xlsx');
       XLSX.utils.book_append_sheet(wb, ws, "sheet1");
       XLSX.writeFile(wb, down);

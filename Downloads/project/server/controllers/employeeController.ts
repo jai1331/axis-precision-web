@@ -79,10 +79,18 @@ export const getEmployeeData = async (req: Request, res: Response) => {
     
     if (startDate && String(startDate) !== String(endDate)) {
       const startDateFormatted = `${startDate.toString().split('-')[1]}-${startDate.toString().split('-')[0]}-${startDate.toString().split('-')[2]}`;
-      queryStr.date = {
-        $gte: new Date(startDateFormatted).toISOString(),
-        $lt: moment(endDateFormatted).endOf('day').toDate().toISOString()
-      };
+      const endDateFormatted = endDate ? `${endDate.toString().split('-')[1]}-${endDate.toString().split('-')[0]}-${endDate.toString().split('-')[2]}` : null;
+      
+      if (endDateFormatted) {
+        queryStr.date = {
+          $gte: new Date(startDateFormatted).toISOString(),
+          $lt: moment(endDateFormatted).endOf('day').toDate().toISOString()
+        };
+      } else {
+        queryStr.date = {
+          $gte: new Date(startDateFormatted).toISOString()
+        };
+      }
     }
 
     const response = await EmployeeForm.find(queryStr).sort({ date: -1 });
@@ -91,7 +99,7 @@ export const getEmployeeData = async (req: Request, res: Response) => {
       return res.json(response);
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: (error as Error).message });
   }
 };
 
@@ -143,10 +151,18 @@ export const downloadExcel = async (req: Request, res: Response) => {
     
     if (startDate && String(startDate) !== String(endDate)) {
       const startDateFormatted = `${startDate.toString().split('-')[1]}-${startDate.toString().split('-')[0]}-${startDate.toString().split('-')[2]}`;
-      queryStr.date = {
-        $gte: new Date(startDateFormatted).toISOString(),
-        $lt: moment(endDateFormatted).endOf('day').toDate().toISOString()
-      };
+      const endDateFormatted = endDate ? `${endDate.toString().split('-')[1]}-${endDate.toString().split('-')[0]}-${endDate.toString().split('-')[2]}` : null;
+      
+      if (endDateFormatted) {
+        queryStr.date = {
+          $gte: new Date(startDateFormatted).toISOString(),
+          $lt: moment(endDateFormatted).endOf('day').toDate().toISOString()
+        };
+      } else {
+        queryStr.date = {
+          $gte: new Date(startDateFormatted).toISOString()
+        };
+      }
     }
 
     const wb = XLSX.utils.book_new();
@@ -164,6 +180,6 @@ export const downloadExcel = async (req: Request, res: Response) => {
       res.download(down);
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: (error as Error).message });
   }
 };

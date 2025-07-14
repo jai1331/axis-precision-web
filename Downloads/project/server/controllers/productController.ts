@@ -7,7 +7,7 @@ export const getProducts = async (req: Request, res: Response) => {
     const products = await Product.find().sort({ lastUpdated: -1 });
     res.status(200).json(products);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: (error as Error).message });
   }
 };
 
@@ -20,7 +20,7 @@ export const getProductById = async (req: Request, res: Response) => {
     }
     res.status(200).json(product);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: (error as Error).message });
   }
 };
 
@@ -31,7 +31,7 @@ export const createProduct = async (req: Request, res: Response) => {
     const savedProduct = await product.save();
     res.status(201).json(savedProduct);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).json({ message: (error as Error).message });
   }
 };
 
@@ -48,7 +48,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     }
     res.status(200).json(updatedProduct);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).json({ message: (error as Error).message });
   }
 };
 
@@ -61,7 +61,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
     }
     res.status(200).json({ message: 'Product deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: (error as Error).message });
   }
 };
 
@@ -164,6 +164,6 @@ export const getDashboardSummary = async (req: Request, res: Response) => {
       monthlyTrend
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: (error as Error).message });
   }
 };

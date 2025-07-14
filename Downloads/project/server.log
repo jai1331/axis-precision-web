@@ -1,0 +1,132 @@
+Attempting to connect to MongoDB Atlas...
+Listening on 9000
+MongoDB disconnected
+MongoDB Atlas connection failed: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://docs.atlas.mongodb.com/security-whitelist/
+Attempting to connect to local MongoDB...
+MongoDB connection error: MongooseServerSelectionError: Could not connect to any servers in your MongoDB Atlas cluster. One common reason is that you're trying to access the database from an IP that isn't whitelisted. Make sure your current IP address is on your Atlas cluster's IP whitelist: https://docs.atlas.mongodb.com/security-whitelist/
+    at Connection.openUri (/Users/jaismac/Desktop/Work/react-native-axisApp/project/node_modules/mongoose/lib/connection.js:847:32)
+    at /Users/jaismac/Desktop/Work/react-native-axisApp/project/node_modules/mongoose/lib/index.js:351:10
+    at /Users/jaismac/Desktop/Work/react-native-axisApp/project/node_modules/mongoose/lib/helpers/promiseOrCallback.js:32:5
+    at new Promise (<anonymous>)
+    at promiseOrCallback (/Users/jaismac/Desktop/Work/react-native-axisApp/project/node_modules/mongoose/lib/helpers/promiseOrCallback.js:31:10)
+    at Mongoose._promiseOrCallback (/Users/jaismac/Desktop/Work/react-native-axisApp/project/node_modules/mongoose/lib/index.js:1149:10)
+    at Mongoose.connect (/Users/jaismac/Desktop/Work/react-native-axisApp/project/node_modules/mongoose/lib/index.js:350:20)
+    at connectToMongoDB (/Users/jaismac/Desktop/Work/react-native-axisApp/project/server.js:56:18)
+    at Object.<anonymous> (/Users/jaismac/Desktop/Work/react-native-axisApp/project/server.js:74:1)
+    at Module._compile (node:internal/modules/cjs/loader:1364:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+    at Module.load (node:internal/modules/cjs/loader:1203:32)
+    at Module._load (node:internal/modules/cjs/loader:1019:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)
+    at node:internal/main/run_main_module:28:49 {
+  reason: TopologyDescription {
+    type: 'ReplicaSetNoPrimary',
+    setName: null,
+    maxSetVersion: null,
+    maxElectionId: null,
+    servers: Map(3) {
+      'cluster0-shard-00-00.b0eqn.mongodb.net:27017' => [ServerDescription],
+      'cluster0-shard-00-01.b0eqn.mongodb.net:27017' => [ServerDescription],
+      'cluster0-shard-00-02.b0eqn.mongodb.net:27017' => [ServerDescription]
+    },
+    stale: false,
+    compatible: true,
+    compatibilityError: null,
+    logicalSessionTimeoutMinutes: null,
+    heartbeatFrequencyMS: 10000,
+    localThresholdMS: 15,
+    commonWireVersion: null
+  }
+}
+Connected successfully to MongoDB
+(node:82780) DeprecationWarning: collection.ensureIndex is deprecated. Use createIndexes instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Connected successfully to local MongoDB
+User Details app employee 12345 null
+password hashed  $2a$10$ConvG1faBnRZn9bAo2ANqenP/2VDdS07YurkZoSxuDz8wW.YHpYGm
+User Details app admin axisSIVA null
+password hashed  $2a$10$BI1HPJcPCKmfwTD0teCvnOnHBWIYLZnWGXYlZEcC2RNyOt02vif0K
+User Details app employee 12345 null
+password hashed  $2a$10$qbqQNj0dRkupJidpa4qaCe0q4/CxSTeLkt7F5yX/wlVmF4NpInpm2
+User Details app admin axisSIVA null
+password hashed  $2a$10$8i8L1GeZB7NA8opA4Hoh8uzBzusizAhfBTXtNAN2e3mmz.PidZshG
+req { username: 'employee', password: '12345' }
+password hashed  $2a$10$FaDCgV1rIFo8v3e5zkGgi.ToFx81TqSWj3KE7QIqdglXMG7VYEvZi
+User created successfully:  {
+  _id: 68739fa1c1f8fd435df2c873,
+  username: 'employee',
+  password: '$2a$10$FaDCgV1rIFo8v3e5zkGgi.ToFx81TqSWj3KE7QIqdglXMG7VYEvZi',
+  __v: 0
+}
+req { username: 'admin', password: 'axisSIVA' }
+password hashed  $2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW
+User created successfully:  {
+  _id: 68739fa5c1f8fd435df2c875,
+  username: 'admin',
+  password: '$2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW',
+  __v: 0
+}
+User Details app employee 12345 {
+  _id: 68739fa1c1f8fd435df2c873,
+  username: 'employee',
+  password: '$2a$10$FaDCgV1rIFo8v3e5zkGgi.ToFx81TqSWj3KE7QIqdglXMG7VYEvZi',
+  __v: 0
+}
+password hashed  $2a$10$kWj.lGJbvzX9O8.3BC3/ueWNBUl007t3O3nPkt3QEGNp0cqzcA9ny
+User Details app admin axisSIVA {
+  _id: 68739fa5c1f8fd435df2c875,
+  username: 'admin',
+  password: '$2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW',
+  __v: 0
+}
+password hashed  $2a$10$PxukB4Bm6.QMbyaGA4VQWOpbRmjKzxQmr9W4HE8Wq6AkfGQ/Dpd/e
+User Details app admin axisSIVA {
+  _id: 68739fa5c1f8fd435df2c875,
+  username: 'admin',
+  password: '$2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW',
+  __v: 0
+}
+password hashed  $2a$10$CH6f88oCe.SjcfRiaYqlsuL2jytibWUV/W/usEX7sr3CJdt8SY/Ou
+User Details app admin axisSIVA {
+  _id: 68739fa5c1f8fd435df2c875,
+  username: 'admin',
+  password: '$2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW',
+  __v: 0
+}
+password hashed  $2a$10$vpsqCmfYVfYHam0GBy08RO4qYKmh0rxRGpc2trwmc27pcl0z.4Yj.
+User Details app employee 12345 {
+  _id: 68739fa1c1f8fd435df2c873,
+  username: 'employee',
+  password: '$2a$10$FaDCgV1rIFo8v3e5zkGgi.ToFx81TqSWj3KE7QIqdglXMG7VYEvZi',
+  __v: 0
+}
+password hashed  $2a$10$p4PeEM5Fp421Fj0O0XTFgu7AcJYkh4SOZWmixKlhnSKdjneoDiHjW
+MongoDB disconnected
+User Details app admin admin {
+  _id: 68739fa5c1f8fd435df2c875,
+  username: 'admin',
+  password: '$2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW',
+  __v: 0
+}
+password hashed  $2a$10$LI84y1PMiMjkWzeSsxIFvuLX9ZScZQ2C0uPO04IsaYWAELu.XhOeG
+User Details app admin admin {
+  _id: 68739fa5c1f8fd435df2c875,
+  username: 'admin',
+  password: '$2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW',
+  __v: 0
+}
+password hashed  $2a$10$QWJTMAJ9NsqddxuLovXMPeLyUJdQGpmyp5pha9KVs.qjWJk417AmK
+User Details app admin axisSIA {
+  _id: 68739fa5c1f8fd435df2c875,
+  username: 'admin',
+  password: '$2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW',
+  __v: 0
+}
+password hashed  $2a$10$nMfv2vRZhVLHRzfJ3yRofuX/aVpyEsDHqxiBHosXT1wzxhCQ5lPha
+User Details app admin axisSIVA {
+  _id: 68739fa5c1f8fd435df2c875,
+  username: 'admin',
+  password: '$2a$10$hHTnzFUu8G0YrPbkL/mSBOKcI.v1tkue/TSmUl7etuMnfEK0N.AjW',
+  __v: 0
+}
+password hashed  $2a$10$UxpRUchQ.f5KnVuke/hIQumcG70/1BCPMor5ft29xfItP2SfK2p.u
