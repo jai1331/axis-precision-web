@@ -184,7 +184,7 @@ app.post('/api/change-password', async (req: Request, res: Response) => {
 
 // Save admin form endpoint
 app.post('/api/saveAdminForm', async (req: Request, res: Response) => {
-  const { customerName, componentName, qty, dcno, internalJobOrder } = req.body;
+  const { customerName, componentName, qty, dcno, internalJobOrder, supplierName, rawMaterialPricePerKg, materialGrade, rawMaterialCost } = req.body;
   console.log(req.body);
   
   try {
@@ -193,7 +193,11 @@ app.post('/api/saveAdminForm', async (req: Request, res: Response) => {
       componentName,
       qty,
       dcno,
-      internalJobOrder
+      internalJobOrder,
+      supplierName,
+      rawMaterialPricePerKg,
+      materialGrade,
+      rawMaterialCost
     });
     return res.json({ status: 'ok', response: response });
   } catch (err) {

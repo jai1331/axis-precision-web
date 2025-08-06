@@ -85,6 +85,10 @@ export default function DataTable() {
         qty: record.qty || 0,
         dcno: record.dcno || '',
         internalJobOrder: record.internalJobOrder || '',
+        supplierName: record.supplierName || 'Unknown',
+        rawMaterialPricePerKg: record.rawMaterialPricePerKg || 0,
+        materialGrade: record.materialGrade || 'Unknown',
+        rawMaterialCost: record.rawMaterialCost || 0,
         machineName: record.machineName || 'Unknown',
         operatorName: record.operatorName || 'Unknown',
         shift: record.shift || 'Day',
@@ -157,6 +161,10 @@ export default function DataTable() {
       filteredEntries.map(entry => ({
         'Customer Name': entry.customerName,
         'Component Name': entry.componentName,
+        'Supplier Name': entry.supplierName,
+        'Material Grade': entry.materialGrade,
+        'Raw Material Price Per Kg': entry.rawMaterialPricePerKg,
+        'Raw Material Cost': entry.rawMaterialCost,
         'Machine Name': entry.machineName,
         'Operator Name': entry.operatorName,
         'Shift': entry.shift,
@@ -190,7 +198,9 @@ export default function DataTable() {
           entry.componentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
           entry.machineName.toLowerCase().includes(searchQuery.toLowerCase()) ||
           entry.operatorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          entry.dcno.toLowerCase().includes(searchQuery.toLowerCase())
+          entry.dcno.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          entry.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          entry.materialGrade.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : entries;
   

@@ -30,6 +30,26 @@ const AdminEntrySchema: Schema = new Schema(
       trim: true,
       default: '',
     },
+    supplierName: {
+      type: String,
+      required: [true, 'Supplier name is required'],
+      trim: true,
+    },
+    rawMaterialPricePerKg: {
+      type: Number,
+      required: [true, 'Raw material price per kg is required'],
+      min: [0, 'Raw material price cannot be negative'],
+    },
+    materialGrade: {
+      type: String,
+      required: [true, 'Material grade is required'],
+      trim: true,
+    },
+    rawMaterialCost: {
+      type: Number,
+      required: [true, 'Raw material cost is required'],
+      min: [0, 'Raw material cost cannot be negative'],
+    },
     machineName: {
       type: String,
       required: [true, 'Machine name is required'],

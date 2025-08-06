@@ -41,6 +41,10 @@ const formSchema = z.object({
   qty: z.coerce.number().int().positive('Quantity must be positive'),
   dcno: z.string().min(1, 'DC number is required'),
   internalJobOrder: z.string().min(1, 'Internal Job Order is required'),
+  supplierName: z.string().min(2, 'Supplier name must be at least 2 characters'),
+  rawMaterialPricePerKg: z.coerce.number().positive('Raw material price must be positive'),
+  materialGrade: z.string().min(1, 'Material grade is required'),
+  rawMaterialCost: z.coerce.number().positive('Raw material cost must be positive'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -69,6 +73,10 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
     qty: initialData?.qty || 0,
     dcno: initialData?.dcno || '',
     internalJobOrder: initialData?.internalJobOrder || '',
+    supplierName: initialData?.supplierName || '',
+    rawMaterialPricePerKg: initialData?.rawMaterialPricePerKg || 0,
+    materialGrade: initialData?.materialGrade || '',
+    rawMaterialCost: initialData?.rawMaterialCost || 0,
   };
 
   const form = useForm<FormValues>({
@@ -498,6 +506,78 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
                     <FormLabel className="text-base font-semibold">DC Number</FormLabel>
                     <FormControl>
                       <Input className="h-12" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Supplier Name */}
+              <FormField
+                control={form.control}
+                name="supplierName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Supplier Name</FormLabel>
+                    <FormControl>
+                      <Input className="h-12" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Raw Material Price Per Kg */}
+              <FormField
+                control={form.control}
+                name="rawMaterialPricePerKg"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Raw Material Price Per Kg</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0.01" 
+                        step="0.01"
+                        className="h-12"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Material Grade */}
+              <FormField
+                control={form.control}
+                name="materialGrade"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Material Grade</FormLabel>
+                    <FormControl>
+                      <Input className="h-12" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Raw Material Cost */}
+              <FormField
+                control={form.control}
+                name="rawMaterialCost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Raw Material Cost</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0.01" 
+                        step="0.01"
+                        className="h-12"
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -122,6 +122,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         dateOfEntry: new Date(record.dateOfEntry || record.date),
         createdAt: record.createdAt ? new Date(record.createdAt) : undefined,
         updatedAt: record.updatedAt ? new Date(record.updatedAt) : undefined,
+        supplierName: record.supplierName || 'Unknown',
+        rawMaterialPricePerKg: record.rawMaterialPricePerKg || 0,
+        materialGrade: record.materialGrade || 'Unknown',
+        rawMaterialCost: record.rawMaterialCost || 0,
       }));
 
       console.log('Processed records:', allRecords.slice(0, 3));
@@ -345,6 +349,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         'Total Working Hr': record.totalWorkingHr,
         'Date of Entry': new Date(record.dateOfEntry).toLocaleDateString(),
         'Remarks': record.remarks || '',
+        'Supplier Name': record.supplierName,
+        'Material Grade': record.materialGrade,
+        'Material Cost': record.rawMaterialCost,
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -653,6 +660,18 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">OPN</span>
                       <span className="text-xs font-medium">{record.opn}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Supplier</span>
+                      <span className="text-xs font-medium">{record.supplierName}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Material Grade</span>
+                      <span className="text-xs font-medium">{record.materialGrade}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Material Cost</span>
+                      <span className="text-xs font-medium">₹{record.rawMaterialCost?.toFixed(2) || '0.00'}</span>
                     </div>
                   </div>
                 </CardContent>

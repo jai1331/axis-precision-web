@@ -32,6 +32,10 @@ export interface ProductionRecord {
   _id?: string;
   componentName: string;
   customerName: string;
+  supplierName: string;
+  rawMaterialPricePerKg: number;
+  materialGrade: string;
+  rawMaterialCost: number;
   machineName: string;
   operatorName: string;
   shift: string;
@@ -61,6 +65,10 @@ export interface AdminEntry {
   qty: number;
   dcno: string;
   internalJobOrder?: string;
+  supplierName: string;
+  rawMaterialPricePerKg: number;
+  materialGrade: string;
+  rawMaterialCost: number;
   machineName: string;
   operatorName: string;
   shift: string;
