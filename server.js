@@ -187,7 +187,7 @@ app.post('/api/register', async (req, res) => {
 })
 
 app.post('/api/saveAdminForm', async(req, res) => {
-	const { customerName, componentName, qty, dcno, internalJobOrder } = req.body;
+	const { customerName, componentName, qty, dcno, internalJobOrder, supplierName, rawMaterialPricePerKg, materialGrade, rawMaterialCost } = req.body;
 	console.log(req.body);
 	try {
 		const response = await adminEntryForm.create({
@@ -195,7 +195,11 @@ app.post('/api/saveAdminForm', async(req, res) => {
 			componentName,
 			qty,
 			dcno,
-			internalJobOrder
+			internalJobOrder,
+			supplierName,
+			rawMaterialPricePerKg,
+			materialGrade,
+			rawMaterialCost
 		});
 		return res.json({ status: 'ok', response: response });
 	} catch(err) {
