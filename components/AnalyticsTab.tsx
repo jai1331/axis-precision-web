@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 import { ProductionRecord, ProductionFilters } from '@/types';
 import ProductionRecordModal from './ProductionRecordModal';
-import { addTimes, getEmployeeData, formatDate } from '@/lib/utils';
+import { addTimes, getEmployeeData, formatDate, getCustomerList } from '@/lib/utils';
 import moment from 'moment';
 import * as XLSX from 'xlsx';
 
@@ -63,10 +63,12 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [summaryData, setSummaryData] = useState<any>({});
+  const [adminEntries, setAdminEntries] = useState<any[]>([]);
   const [filterOptions, setFilterOptions] = useState({
     customers: [] as string[],
     suppliers: [] as string[],
     jobOrders: [] as string[],
+    materialGrades: [] as string[],
   });
   const { toast } = useToast();
 
@@ -81,6 +83,11 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     internalJobOrder: 'all',
     customerName: 'all',
     supplierName: 'all',
+    materialGrade: 'all',
+    rawMaterialPricePerKgMin: '',
+    rawMaterialPricePerKgMax: '',
+    rawMaterialCostMin: '',
+    rawMaterialCostMax: '',
   });
 
   const [savedFilters, setSavedFilters] = useState<ProductionFilters>({
@@ -92,6 +99,11 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     internalJobOrder: 'all',
     customerName: 'all',
     supplierName: 'all',
+    materialGrade: 'all',
+    rawMaterialPricePerKgMin: '',
+    rawMaterialPricePerKgMax: '',
+    rawMaterialCostMin: '',
+    rawMaterialCostMax: '',
   });
 
   const [tempFilters, setTempFilters] = useState<ProductionFilters>({
@@ -103,7 +115,25 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     internalJobOrder: 'all',
     customerName: 'all',
     supplierName: 'all',
+    materialGrade: 'all',
+    rawMaterialPricePerKgMin: '',
+    rawMaterialPricePerKgMax: '',
+    rawMaterialCostMin: '',
+    rawMaterialCostMax: '',
   });
+
+  useEffect(() => {
+    fetchAdminEntries();
+  }, []);
+
+  const fetchAdminEntries = async () => {
+    try {
+      const data = await getCustomerList();
+      setAdminEntries(data);
+    } catch (error) {
+      console.error('Error fetching admin entries:', error);
+    }
+  };
 
   useEffect(() => {
     console.log('AnalyticsTab received productionData:', productionData);
@@ -112,35 +142,44 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     if (productionData && productionData.length > 0) {
       console.log('Processing production data, length:', productionData.length);
       // Process production data to match ProductionRecord interface
-      const allRecords = productionData.map((record: any) => ({
-        _id: record._id || record.id,
-        componentName: record.componentName || 'Unknown',
-        customerName: record.customerName || 'Unknown',
-        machineName: record.machineName || record.machine || 'Unknown',
-        operatorName: record.operatorName || 'Unknown',
-        shift: record.shift || 'Day',
-        qty: record.qty || 0,
-        additionalQty: record.additionalQty || 0,
-        totalQty: record.totalQty || record.qty || 0,
-        opn: record.opn || '',
-        progNo: record.progNo || '',
-        settingTime: record.settingTime || 0,
-        cycleTime: record.cycleTime || 0,
-        handlingTime: record.handlingTime || 0,
-        idleTime: record.idleTime || 0,
-        startTime: record.startTime,
-        endTime: record.endTime,
-        totalProductionHr: record.totalProductionHr || 0,
-        totalWorkingHr: record.totalWorkingHrs || 0,
-        remarks: record.remarks || '',
-        dateOfEntry: new Date(record.dateOfEntry || record.date),
-        createdAt: record.createdAt ? new Date(record.createdAt) : undefined,
-        updatedAt: record.updatedAt ? new Date(record.updatedAt) : undefined,
-        supplierName: record.supplierName || 'Unknown',
-        rawMaterialPricePerKg: record.rawMaterialPricePerKg || 0,
-        materialGrade: record.materialGrade || 'Unknown',
-        rawMaterialCost: record.rawMaterialCost || 0,
-      }));
+      const allRecords = productionData.map((record: any) => {
+        // Find matching admin entry for additional data
+        const adminEntry = adminEntries.find((admin: any) => 
+          admin.customerName === record.customerName && 
+          admin.componentName === record.componentName
+        );
+        
+        return {
+          _id: record._id || record.id,
+          componentName: record.componentName || 'Unknown',
+          customerName: record.customerName || 'Unknown',
+          machineName: record.machineName || record.machine || 'Unknown',
+          operatorName: record.operatorName || 'Unknown',
+          shift: record.shift || 'Day',
+          qty: record.qty || 0,
+          additionalQty: record.additionalQty || 0,
+          totalQty: record.totalQty || record.qty || 0,
+          opn: record.opn || '',
+          progNo: record.progNo || '',
+          settingTime: record.settingTime || 0,
+          cycleTime: record.cycleTime || 0,
+          handlingTime: record.handlingTime || 0,
+          idleTime: record.idleTime || 0,
+          startTime: record.startTime,
+          endTime: record.endTime,
+          totalProductionHr: record.totalProductionHr || 0,
+          totalWorkingHr: record.totalWorkingHrs || 0,
+          remarks: record.remarks || '',
+          dateOfEntry: new Date(record.dateOfEntry || record.date),
+          createdAt: record.createdAt ? new Date(record.createdAt) : undefined,
+          updatedAt: record.updatedAt ? new Date(record.updatedAt) : undefined,
+          supplierName: record.supplierName || 'Unknown',
+          rawMaterialPricePerKg: record.rawMaterialPricePerKg || 0,
+          materialGrade: record.materialGrade || 'Unknown',
+          rawMaterialCost: record.rawMaterialCost || 0,
+          internalJobOrder: adminEntry?.internalJobOrder || record.internalJobOrder || '',
+        };
+      });
 
       console.log('Processed records:', allRecords.slice(0, 3));
       setRecords(allRecords);
@@ -162,18 +201,20 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
   // Extract filter options from records
   useEffect(() => {
-    if (records.length > 0) {
+    if (records.length > 0 && adminEntries.length > 0) {
       const uniqueCustomers = [...new Set(records.map(record => record.customerName))].sort();
       const uniqueSuppliers = [...new Set(records.map(record => record.supplierName))].sort();
-      const uniqueJobOrders = [...new Set(records.map(record => record.internalJobOrder).filter((jobOrder): jobOrder is string => Boolean(jobOrder)))].sort();
+      const uniqueJobOrders = [...new Set(adminEntries.map(admin => admin.internalJobOrder).filter((jobOrder): jobOrder is string => Boolean(jobOrder)))].sort();
+      const uniqueMaterialGrades = [...new Set(adminEntries.map(admin => admin.materialGrade).filter((grade): grade is string => Boolean(grade)))].sort();
       
       setFilterOptions({
         customers: uniqueCustomers,
         suppliers: uniqueSuppliers,
         jobOrders: uniqueJobOrders,
+        materialGrades: uniqueMaterialGrades,
       });
     }
-  }, [records]);
+  }, [records, adminEntries]);
 
   const applyFilters = () => {
     let filtered = [...records];
@@ -190,8 +231,16 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
     // Apply job order filter
     if (filters.internalJobOrder && filters.internalJobOrder !== 'all') {
+      // Filter based on admin entries with matching internal job order
+      const matchingAdminEntries = adminEntries.filter(admin => 
+        admin.internalJobOrder && admin.internalJobOrder.toLowerCase().includes(filters.internalJobOrder.toLowerCase())
+      );
+      
       filtered = filtered.filter(record => 
-        record.internalJobOrder && record.internalJobOrder.toLowerCase().includes(filters.internalJobOrder.toLowerCase())
+        matchingAdminEntries.some(admin => 
+          admin.customerName === record.customerName && 
+          admin.componentName === record.componentName
+        )
       );
     }
 
@@ -206,6 +255,54 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     if (filters.supplierName && filters.supplierName !== 'all') {
       filtered = filtered.filter(record => 
         record.supplierName.toLowerCase().includes(filters.supplierName.toLowerCase())
+      );
+    }
+
+    // Apply material grade filter
+    if (filters.materialGrade && filters.materialGrade !== 'all') {
+      const matchingAdminEntries = adminEntries.filter(admin => 
+        admin.materialGrade && admin.materialGrade.toLowerCase().includes(filters.materialGrade.toLowerCase())
+      );
+      
+      filtered = filtered.filter(record => 
+        matchingAdminEntries.some(admin => 
+          admin.customerName === record.customerName && 
+          admin.componentName === record.componentName
+        )
+      );
+    }
+
+    // Apply raw material price per kg filter
+    if (filters.rawMaterialPricePerKgMin || filters.rawMaterialPricePerKgMax) {
+      const matchingAdminEntries = adminEntries.filter(admin => {
+        const price = admin.rawMaterialPricePerKg || 0;
+        const minPrice = filters.rawMaterialPricePerKgMin ? parseFloat(filters.rawMaterialPricePerKgMin) : 0;
+        const maxPrice = filters.rawMaterialPricePerKgMax ? parseFloat(filters.rawMaterialPricePerKgMax) : Infinity;
+        return price >= minPrice && price <= maxPrice;
+      });
+      
+      filtered = filtered.filter(record => 
+        matchingAdminEntries.some(admin => 
+          admin.customerName === record.customerName && 
+          admin.componentName === record.componentName
+        )
+      );
+    }
+
+    // Apply raw material cost filter
+    if (filters.rawMaterialCostMin || filters.rawMaterialCostMax) {
+      const matchingAdminEntries = adminEntries.filter(admin => {
+        const cost = admin.rawMaterialCost || 0;
+        const minCost = filters.rawMaterialCostMin ? parseFloat(filters.rawMaterialCostMin) : 0;
+        const maxCost = filters.rawMaterialCostMax ? parseFloat(filters.rawMaterialCostMax) : Infinity;
+        return cost >= minCost && cost <= maxCost;
+      });
+      
+      filtered = filtered.filter(record => 
+        matchingAdminEntries.some(admin => 
+          admin.customerName === record.customerName && 
+          admin.componentName === record.componentName
+        )
       );
     }
 
@@ -352,6 +449,11 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       internalJobOrder: 'all',
       customerName: 'all',
       supplierName: 'all',
+      materialGrade: 'all',
+      rawMaterialPricePerKgMin: '',
+      rawMaterialPricePerKgMax: '',
+      rawMaterialCostMin: '',
+      rawMaterialCostMax: '',
     };
     setTempFilters(defaultFilters);
     setFilters(defaultFilters);
@@ -428,7 +530,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const hasActiveFilters = tempFilters.search || tempFilters.startDate || tempFilters.endDate || 
     (tempFilters.internalJobOrder && tempFilters.internalJobOrder !== 'all') ||
     (tempFilters.customerName && tempFilters.customerName !== 'all') ||
-    (tempFilters.supplierName && tempFilters.supplierName !== 'all');
+    (tempFilters.supplierName && tempFilters.supplierName !== 'all') ||
+    (tempFilters.materialGrade && tempFilters.materialGrade !== 'all') ||
+    tempFilters.rawMaterialPricePerKgMin || tempFilters.rawMaterialPricePerKgMax ||
+    tempFilters.rawMaterialCostMin || tempFilters.rawMaterialCostMax;
   const hasUnsavedChanges = JSON.stringify(tempFilters) !== JSON.stringify(savedFilters);
 
   const formatTime = (timeStr: string) => {
@@ -611,15 +716,15 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
             </div>
           </div>
 
-          {/* Additional Filters Row 
+          {/* Additional Filters Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-            
+            {/* Internal Job Order Filter */}
             <Select
               value={tempFilters.internalJobOrder}
               onValueChange={(value) => handleTempFilterChange('internalJobOrder', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select job order" />
+                <SelectValue placeholder="All Job Orders" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Job Orders</SelectItem>
@@ -631,13 +736,13 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               </SelectContent>
             </Select>
 
-            
+            {/* Customer Filter */}
             <Select
               value={tempFilters.customerName}
               onValueChange={(value) => handleTempFilterChange('customerName', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select customer" />
+                <SelectValue placeholder="All Customers" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Customers</SelectItem>
@@ -649,13 +754,13 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               </SelectContent>
             </Select>
 
-            
+            {/* Supplier Filter */}
             <Select
               value={tempFilters.supplierName}
               onValueChange={(value) => handleTempFilterChange('supplierName', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select supplier" />
+                <SelectValue placeholder="All Suppliers" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Suppliers</SelectItem>
@@ -666,7 +771,61 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                 ))}
               </SelectContent>
             </Select>
-          </div> */}
+
+            {/* Material Grade Filter */}
+            <Select
+              value={tempFilters.materialGrade}
+              onValueChange={(value) => handleTempFilterChange('materialGrade', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Material Grades" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Material Grades</SelectItem>
+                {filterOptions.materialGrades.map((grade) => (
+                  <SelectItem key={grade} value={grade}>
+                    {grade}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Raw Material Price Per Kg Range */}
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Min price/kg"
+                value={tempFilters.rawMaterialPricePerKgMin}
+                onChange={(e) => handleTempFilterChange('rawMaterialPricePerKgMin', e.target.value)}
+                className="w-full"
+              />
+              <Input
+                type="number"
+                placeholder="Max price/kg"
+                value={tempFilters.rawMaterialPricePerKgMax}
+                onChange={(e) => handleTempFilterChange('rawMaterialPricePerKgMax', e.target.value)}
+                className="w-full"
+              />
+            </div>
+
+            {/* Raw Material Cost Range */}
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Min cost"
+                value={tempFilters.rawMaterialCostMin}
+                onChange={(e) => handleTempFilterChange('rawMaterialCostMin', e.target.value)}
+                className="w-full"
+              />
+              <Input
+                type="number"
+                placeholder="Max cost"
+                value={tempFilters.rawMaterialCostMax}
+                onChange={(e) => handleTempFilterChange('rawMaterialCostMax', e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </div>
 
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -828,6 +987,12 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                       <span className="text-xs text-muted-foreground">Material Cost</span>
                       <span className="text-xs font-medium">₹{record.rawMaterialCost?.toFixed(2) || '0.00'}</span>
                     </div>
+                    {record.internalJobOrder && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Job Order</span>
+                        <span className="text-xs font-medium">{record.internalJobOrder}</span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

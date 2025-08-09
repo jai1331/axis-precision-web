@@ -100,6 +100,11 @@ export interface ProductionFilters {
   internalJobOrder: string;
   customerName: string;
   supplierName: string;
+  materialGrade: string;
+  rawMaterialPricePerKgMin: string;
+  rawMaterialPricePerKgMax: string;
+  rawMaterialCostMin: string;
+  rawMaterialCostMax: string;
 }
 
 export interface EmployeeForm {
