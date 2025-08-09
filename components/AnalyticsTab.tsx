@@ -63,6 +63,11 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [summaryData, setSummaryData] = useState<any>({});
+  const [filterOptions, setFilterOptions] = useState({
+    customers: [] as string[],
+    suppliers: [] as string[],
+    jobOrders: [] as string[],
+  });
   const { toast } = useToast();
 
   const itemsPerPage = 12;
@@ -73,6 +78,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     sortOrder: 'desc',
     startDate: '',
     endDate: '',
+    internalJobOrder: 'all',
+    customerName: 'all',
+    supplierName: 'all',
   });
 
   const [savedFilters, setSavedFilters] = useState<ProductionFilters>({
@@ -81,6 +89,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     sortOrder: 'desc',
     startDate: '',
     endDate: '',
+    internalJobOrder: 'all',
+    customerName: 'all',
+    supplierName: 'all',
   });
 
   const [tempFilters, setTempFilters] = useState<ProductionFilters>({
@@ -89,6 +100,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     sortOrder: 'desc',
     startDate: '',
     endDate: '',
+    internalJobOrder: 'all',
+    customerName: 'all',
+    supplierName: 'all',
   });
 
   useEffect(() => {
@@ -146,6 +160,21 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     applyFilters();
   }, [records, filters, dashboardData]);
 
+  // Extract filter options from records
+  useEffect(() => {
+    if (records.length > 0) {
+      const uniqueCustomers = [...new Set(records.map(record => record.customerName))].sort();
+      const uniqueSuppliers = [...new Set(records.map(record => record.supplierName))].sort();
+      const uniqueJobOrders = [...new Set(records.map(record => record.internalJobOrder).filter((jobOrder): jobOrder is string => Boolean(jobOrder)))].sort();
+      
+      setFilterOptions({
+        customers: uniqueCustomers,
+        suppliers: uniqueSuppliers,
+        jobOrders: uniqueJobOrders,
+      });
+    }
+  }, [records]);
+
   const applyFilters = () => {
     let filtered = [...records];
 
@@ -156,6 +185,27 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         record.customerName.toLowerCase().includes(filters.search.toLowerCase()) ||
         record.machineName.toLowerCase().includes(filters.search.toLowerCase()) ||
         record.operatorName.toLowerCase().includes(filters.search.toLowerCase())
+      );
+    }
+
+    // Apply job order filter
+    if (filters.internalJobOrder && filters.internalJobOrder !== 'all') {
+      filtered = filtered.filter(record => 
+        record.internalJobOrder && record.internalJobOrder.toLowerCase().includes(filters.internalJobOrder.toLowerCase())
+      );
+    }
+
+    // Apply customer filter
+    if (filters.customerName && filters.customerName !== 'all') {
+      filtered = filtered.filter(record => 
+        record.customerName.toLowerCase().includes(filters.customerName.toLowerCase())
+      );
+    }
+
+    // Apply supplier filter
+    if (filters.supplierName && filters.supplierName !== 'all') {
+      filtered = filtered.filter(record => 
+        record.supplierName.toLowerCase().includes(filters.supplierName.toLowerCase())
       );
     }
 
@@ -299,6 +349,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       sortOrder: 'desc' as const,
       startDate: '',
       endDate: '',
+      internalJobOrder: 'all',
+      customerName: 'all',
+      supplierName: 'all',
     };
     setTempFilters(defaultFilters);
     setFilters(defaultFilters);
@@ -372,7 +425,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     }
   };
 
-  const hasActiveFilters = tempFilters.search || tempFilters.startDate || tempFilters.endDate;
+  const hasActiveFilters = tempFilters.search || tempFilters.startDate || tempFilters.endDate || 
+    (tempFilters.internalJobOrder && tempFilters.internalJobOrder !== 'all') ||
+    (tempFilters.customerName && tempFilters.customerName !== 'all') ||
+    (tempFilters.supplierName && tempFilters.supplierName !== 'all');
   const hasUnsavedChanges = JSON.stringify(tempFilters) !== JSON.stringify(savedFilters);
 
   const formatTime = (timeStr: string) => {
@@ -437,6 +493,48 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         </Card>
       </div>
 
+      {/* Job Order Summary Cards */}
+      {hasActiveFilters && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Records</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{filteredRecords.length}</div>
+              <p className="text-xs text-muted-foreground">Filtered records</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {filteredRecords.reduce((sum, record) => sum + record.totalQty, 0).toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">Total qty</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Material Cost</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ₹{filteredRecords.reduce((sum, record) => sum + record.rawMaterialCost, 0).toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">Total cost</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Filters Section */}
       <Card>
         <CardHeader>
@@ -446,7 +544,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -512,6 +610,63 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               />
             </div>
           </div>
+
+          {/* Additional Filters Row 
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            
+            <Select
+              value={tempFilters.internalJobOrder}
+              onValueChange={(value) => handleTempFilterChange('internalJobOrder', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select job order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Job Orders</SelectItem>
+                {filterOptions.jobOrders.map((jobOrder) => (
+                  <SelectItem key={jobOrder} value={jobOrder}>
+                    {jobOrder}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            
+            <Select
+              value={tempFilters.customerName}
+              onValueChange={(value) => handleTempFilterChange('customerName', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {filterOptions.customers.map((customer) => (
+                  <SelectItem key={customer} value={customer}>
+                    {customer}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            
+            <Select
+              value={tempFilters.supplierName}
+              onValueChange={(value) => handleTempFilterChange('supplierName', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select supplier" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Suppliers</SelectItem>
+                {filterOptions.suppliers.map((supplier) => (
+                  <SelectItem key={supplier} value={supplier}>
+                    {supplier}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div> */}
 
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-2">

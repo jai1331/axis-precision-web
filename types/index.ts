@@ -54,6 +54,7 @@ export interface ProductionRecord {
   totalWorkingHr: number;
   remarks: string;
   dateOfEntry: Date;
+  internalJobOrder?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -96,6 +97,9 @@ export interface ProductionFilters {
   sortOrder: 'asc' | 'desc';
   startDate: string;
   endDate: string;
+  internalJobOrder: string;
+  customerName: string;
+  supplierName: string;
 }
 
 export interface EmployeeForm {

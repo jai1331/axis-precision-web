@@ -40,9 +40,9 @@ const formSchema = z.object({
   shift: z.enum(['First', 'Second', 'Third', '12hrMng', '12hrNight']),
   machine: z.enum(['TC-1', 'TC-2', 'TC-3', 'VMC']),
   customerName: z.string().min(2, 'Customer name is required'),
-  componentName: z.string().min(2, 'Component name is required'),
+  componentName: z.string().min(1, 'Component name is required'),
   qty: z.coerce.number().int().positive('Quantity must be positive'),
-  additionalQty: z.coerce.number().int().nonnegative('Additional quantity must be non-negative').optional(),
+  additionalQty: z.coerce.number().int().nonnegative('Additional quantity must be non-negative').optional().or(z.literal('')),
   opn: z.enum(['preMC', 'first_opn', 'second_opn', 'third_opn', 'fourth_opn', 'R/W']),
   progNo: z.string().min(1, 'Program number is required'),
   settingTime: z.string().min(1, 'Setting time is required'),
@@ -51,7 +51,7 @@ const formSchema = z.object({
   idleTime: z.string().min(1, 'Idle time is required'),
   startTime: z.string().min(1, 'Start time is required'),
   endTime: z.string().min(1, 'End time is required'),
-  remarks: z.string().optional(),
+  remarks: z.string().optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -116,7 +116,7 @@ export default function EmployeeEntryForm() {
     customerName: '',
     componentName: '',
     qty: 0,
-    additionalQty: 0,
+    additionalQty: undefined,
     opn: 'preMC',
     progNo: '',
     settingTime: '00:00:00',
@@ -131,6 +131,7 @@ export default function EmployeeEntryForm() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues,
+    mode: 'onBlur',
   });
 
   const watchedCustomer = form.watch('customerName');
@@ -140,6 +141,21 @@ export default function EmployeeEntryForm() {
   useEffect(() => {
     fetchCustomer();
   }, []);
+
+  // Reset component name when customer changes
+  useEffect(() => {
+    if (watchedCustomer) {
+      const customerComponents = customerAdminEntry.filter(
+        (entry: any) => entry.customerName === watchedCustomer
+      );
+      
+      if (customerComponents.length > 0 && !form.getValues('componentName')) {
+        const firstComponent = customerComponents[0];
+        form.setValue('componentName', firstComponent.componentName);
+        setTotalQty(firstComponent);
+      }
+    }
+  }, [watchedCustomer, customerAdminEntry, form]);
 
   // On form load, set picker values from defaultValues
   useEffect(() => {
@@ -296,6 +312,20 @@ export default function EmployeeEntryForm() {
 
   const onSubmit = async (values: FormValues) => {
     try {
+      console.log('Form values being submitted:', values);
+      console.log('Form is valid:', form.formState.isValid);
+      console.log('Form errors:', form.formState.errors);
+      
+      // Validate required fields
+      if (!values.operatorName || !values.date || !values.customerName || !values.componentName) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please fill in all required fields',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
       // Check quantity validation
       if (Object.keys(totalQtySave).length && totalQtySave.qty < parseInt(values.qty.toString())) {
         toast({
@@ -309,10 +339,11 @@ export default function EmployeeEntryForm() {
 
       setModalVisible(true);
       setFormValues(values);
+      console.log('Modal should be visible now, formValues set:', values);
       
       // Calculate production hours
       const addedCycleHandleTime = addTimes(values.cycleTime, values.handlingTime);
-      const totalQty = values.additionalQty ? values.qty + values.additionalQty : values.qty;
+      const totalQty = values.additionalQty && values.additionalQty > 0 ? values.qty + values.additionalQty : values.qty;
       const qtyFilledArray = Array(totalQty).fill(addedCycleHandleTime);
       
       const totalCycleHandleTimeWithQty = qtyFilledArray.reduce((acc, obj) => {
@@ -348,8 +379,12 @@ export default function EmployeeEntryForm() {
     setLoader(true);
     
     try {
+      console.log('Starting save process...');
+      console.log('Form values:', formValues);
+      
       // Convert date to ISO format
       const isoDate = new Date(formValues.date).toISOString();
+      console.log('Converted date:', isoDate);
 
       // Prepare payload
       const payload = {
@@ -357,6 +392,9 @@ export default function EmployeeEntryForm() {
         date: isoDate,
         ...(showUpdateBtn ? { id: showUpdateBtn } : {}),
       };
+      
+      console.log('Payload being sent:', payload);
+      console.log('Request method:', showUpdateBtn ? 'PUT' : 'POST');
 
       const response = await fetch('/api/employeeForm', {
         method: showUpdateBtn ? 'PUT' : 'POST',
@@ -366,11 +404,17 @@ export default function EmployeeEntryForm() {
         body: JSON.stringify(payload), 
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
       if (!response.ok) {
-        throw new Error('Failed to save employee entry');
+        const errorText = await response.text();
+        console.error('Response error text:', errorText);
+        throw new Error(`Failed to save employee entry: ${response.status} - ${errorText}`);
       }
 
       const res = await response.json();
+      console.log('Response data:', res);
       
       if (res && res.status === 'ok') {
         setLoader(false);
@@ -402,13 +446,16 @@ export default function EmployeeEntryForm() {
             description: 'Entry saved successfully. Form reset for new entry.',
           });
         }
+      } else {
+        console.error('Response status not ok:', res);
+        throw new Error(`Server returned status: ${res.status || 'unknown'}`);
       }
     } catch (error) {
       setLoader(false);
       console.error('Error saving employee entry:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save employee entry',
+        description: `Failed to save employee entry: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: 'destructive',
       });
     }
@@ -421,17 +468,7 @@ export default function EmployeeEntryForm() {
 
   const handleCustomerChange = (customerName: string) => {
     form.setValue('customerName', customerName);
-    
-    // Find components for this customer and set the first one
-    const customerComponents = customerAdminEntry.filter(
-      (entry: any) => entry.customerName === customerName
-    );
-    
-    if (customerComponents.length > 0) {
-      const firstComponent = customerComponents[0];
-      form.setValue('componentName', firstComponent.componentName);
-      setTotalQty(firstComponent);
-    }
+    form.setValue('componentName', ''); // Clear component name
   };
 
   // Get available quantity display
@@ -465,7 +502,17 @@ export default function EmployeeEntryForm() {
         </CardHeader>
         <CardContent className="pt-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit((values) => {
+              console.log('Form submitted successfully with values:', values);
+              onSubmit(values);
+            }, (errors) => {
+              console.error('Form validation errors:', errors);
+              toast({
+                title: 'Validation Error',
+                description: 'Please check all required fields and try again.',
+                variant: 'destructive',
+              });
+            })} className="space-y-6">
               {/* Operator Name */}
               <FormField
                 control={form.control}
@@ -591,20 +638,41 @@ export default function EmployeeEntryForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Component Name</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      onValueChange={(value) => {
+                        try {
+                          field.onChange(value);
+                          // Update quantity when component changes
+                          if (value && watchedCustomer) {
+                            const componentEntry = customerAdminEntry.find(
+                              (entry: any) => entry.customerName === watchedCustomer && entry.componentName === value
+                            );
+                            if (componentEntry) {
+                              setTotalQty(componentEntry);
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Error updating component:', error);
+                        }
+                      }} 
+                      defaultValue={field.value}
+                      disabled={!watchedCustomer || customerAdminEntry.filter((entry: any) => entry.customerName === watchedCustomer).length === 0}
+                    >
                       <FormControl>
                         <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Select component" />
+                          <SelectValue placeholder={!watchedCustomer ? "Select customer first" : "Select component"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {customerAdminEntry
-                          .filter((entry: any) => entry.customerName === watchedCustomer)
-                          .map((entry: any, index: number) => (
-                            <SelectItem key={index} value={entry.componentName}>
-                              {entry.componentName}
-                            </SelectItem>
-                          ))}
+                        {watchedCustomer && [...new Set(
+                          customerAdminEntry
+                            .filter((entry: any) => entry.customerName === watchedCustomer)
+                            .map((entry: any) => entry.componentName)
+                        )].map((componentName: string) => (
+                          <SelectItem key={componentName} value={componentName}>
+                            {componentName}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -676,7 +744,18 @@ export default function EmployeeEntryForm() {
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Additional Qty: Enter if available</FormLabel>
                     <FormControl>
-                      <Input type="number" min="0" maxLength={7} className="h-12" {...field} />
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        maxLength={7} 
+                        className="h-12" 
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          field.onChange(value === '' ? undefined : parseInt(value, 10));
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -859,6 +938,11 @@ export default function EmployeeEntryForm() {
                   disabled={isSubmitting || modalVisible}
                   className="w-full md:w-auto px-12 py-3 text-lg font-semibold bg-[#84c225] hover:bg-[#6fa01c]"
                   size="lg"
+                  onClick={() => {
+                    console.log('Submit button clicked');
+                    console.log('Form state:', form.formState);
+                    console.log('Form values:', form.getValues());
+                  }}
                 >
                   {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                   {showUpdateBtn ? 'UPDATE' : 'SUBMIT'}
@@ -884,7 +968,7 @@ export default function EmployeeEntryForm() {
             <div><strong>Customer Name:</strong> {formValues.customerName}</div>
             <div><strong>Component Name:</strong> {formValues.componentName}</div>
             <div><strong>Qty:</strong> {formValues.qty}</div>
-            {(formValues.additionalQty || formValues.additionalQty >= 0) && (
+            {formValues.additionalQty && formValues.additionalQty > 0 && (
               <div><strong>Additional Qty:</strong> {formValues.additionalQty}</div>
             )}
             <div><strong>OPN:</strong> {formValues.opn}</div>
@@ -902,7 +986,10 @@ export default function EmployeeEntryForm() {
 
           <div className="flex justify-center gap-4 pt-6">
             <Button
-              onClick={saveFormData}
+              onClick={() => {
+                console.log('Save button clicked');
+                saveFormData();
+              }}
               disabled={loader}
               className="bg-blue-600 hover:bg-blue-700"
             >
