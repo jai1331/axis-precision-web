@@ -231,16 +231,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
     // Apply job order filter
     if (filters.internalJobOrder && filters.internalJobOrder !== 'all') {
-      // Filter based on admin entries with matching internal job order
-      const matchingAdminEntries = adminEntries.filter(admin => 
-        admin.internalJobOrder && admin.internalJobOrder.toLowerCase().includes(filters.internalJobOrder.toLowerCase())
-      );
-      
       filtered = filtered.filter(record => 
-        matchingAdminEntries.some(admin => 
-          admin.customerName === record.customerName && 
-          admin.componentName === record.componentName
-        )
+        record.internalJobOrder && 
+        record.internalJobOrder.toLowerCase().includes(filters.internalJobOrder.toLowerCase())
       );
     }
 
@@ -260,50 +253,30 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
     // Apply material grade filter
     if (filters.materialGrade && filters.materialGrade !== 'all') {
-      const matchingAdminEntries = adminEntries.filter(admin => 
-        admin.materialGrade && admin.materialGrade.toLowerCase().includes(filters.materialGrade.toLowerCase())
-      );
-      
       filtered = filtered.filter(record => 
-        matchingAdminEntries.some(admin => 
-          admin.customerName === record.customerName && 
-          admin.componentName === record.componentName
-        )
+        record.materialGrade && 
+        record.materialGrade.toLowerCase().includes(filters.materialGrade.toLowerCase())
       );
     }
 
     // Apply raw material price per kg filter
     if (filters.rawMaterialPricePerKgMin || filters.rawMaterialPricePerKgMax) {
-      const matchingAdminEntries = adminEntries.filter(admin => {
-        const price = admin.rawMaterialPricePerKg || 0;
+      filtered = filtered.filter(record => {
+        const price = record.rawMaterialPricePerKg || 0;
         const minPrice = filters.rawMaterialPricePerKgMin ? parseFloat(filters.rawMaterialPricePerKgMin) : 0;
         const maxPrice = filters.rawMaterialPricePerKgMax ? parseFloat(filters.rawMaterialPricePerKgMax) : Infinity;
         return price >= minPrice && price <= maxPrice;
       });
-      
-      filtered = filtered.filter(record => 
-        matchingAdminEntries.some(admin => 
-          admin.customerName === record.customerName && 
-          admin.componentName === record.componentName
-        )
-      );
     }
 
     // Apply raw material cost filter
     if (filters.rawMaterialCostMin || filters.rawMaterialCostMax) {
-      const matchingAdminEntries = adminEntries.filter(admin => {
-        const cost = admin.rawMaterialCost || 0;
+      filtered = filtered.filter(record => {
+        const cost = record.rawMaterialCost || 0;
         const minCost = filters.rawMaterialCostMin ? parseFloat(filters.rawMaterialCostMin) : 0;
         const maxCost = filters.rawMaterialCostMax ? parseFloat(filters.rawMaterialCostMax) : Infinity;
         return cost >= minCost && cost <= maxCost;
       });
-      
-      filtered = filtered.filter(record => 
-        matchingAdminEntries.some(admin => 
-          admin.customerName === record.customerName && 
-          admin.componentName === record.componentName
-        )
-      );
     }
 
     // Apply date range filter
@@ -484,35 +457,71 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const handleExportExcel = () => {
     try {
       const exportData = filteredRecords.map(record => ({
-        'Component Name': record.componentName,
-        'Customer Name': record.customerName,
-        'Machine Name': record.machineName,
-        'Operator Name': record.operatorName,
-        'Shift': record.shift,
-        'Quantity': record.qty,
-        'Additional Qty': record.additionalQty,
-        'Total Qty': record.totalQty,
-        'OPN': record.opn,
-        'Program No': record.progNo,
-        'Setting Time (min)': record.settingTime,
-        'Cycle Time (min)': record.cycleTime,
-        'Handling Time (min)': record.handlingTime,
-        'Idle Time (min)': record.idleTime,
-        'Start Time': new Date(record.startTime).toLocaleString(),
-        'End Time': new Date(record.endTime).toLocaleString(),
-        'Total Production Hr': record.totalProductionHr,
-        'Total Working Hr': record.totalWorkingHr,
-        'Date of Entry': new Date(record.dateOfEntry).toLocaleDateString(),
+        'Date of Entry': new Date(record.dateOfEntry).toLocaleDateString('en-IN'),
+        'Component Name': record.componentName || '',
+        'Customer Name': record.customerName || '',
+        'Internal Job Order': record.internalJobOrder || '',
+        'Machine Name': record.machineName || '',
+        'Operator Name': record.operatorName || '',
+        'Shift': record.shift || '',
+        'Quantity': record.qty || 0,
+        'Additional Qty': record.additionalQty || 0,
+        'Total Qty': record.totalQty || 0,
+        'OPN': record.opn || '',
+        'Program No': record.progNo || '',
+        'Setting Time (HH:MM:SS)': record.settingTime || '00:00:00',
+        'Cycle Time (HH:MM:SS)': record.cycleTime || '00:00:00',
+        'Handling Time (HH:MM:SS)': record.handlingTime || '00:00:00',
+        'Idle Time (HH:MM:SS)': record.idleTime || '00:00:00',
+        'Start Time': typeof record.startTime === 'string' ? record.startTime : new Date(record.startTime).toLocaleString('en-IN'),
+        'End Time': typeof record.endTime === 'string' ? record.endTime : new Date(record.endTime).toLocaleString('en-IN'),
+        'Total Production Hr': record.totalProductionHr || 0,
+        'Total Working Hr': record.totalWorkingHr || 0,
+        'Supplier Name': record.supplierName || '',
+        'Material Grade': record.materialGrade || '',
+        'Raw Material Price Per Kg': record.rawMaterialPricePerKg || 0,
+        'Raw Material Cost': record.rawMaterialCost || 0,
         'Remarks': record.remarks || '',
-        'Supplier Name': record.supplierName,
-        'Material Grade': record.materialGrade,
-        'Material Cost': record.rawMaterialCost,
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths for better spacing
+      const columnWidths = [
+        { wch: 12 }, // Date of Entry
+        { wch: 25 }, // Component Name
+        { wch: 20 }, // Customer Name
+        { wch: 18 }, // Internal Job Order
+        { wch: 12 }, // Machine Name
+        { wch: 15 }, // Operator Name
+        { wch: 10 }, // Shift
+        { wch: 10 }, // Quantity
+        { wch: 12 }, // Additional Qty
+        { wch: 10 }, // Total Qty
+        { wch: 8 },  // OPN
+        { wch: 12 }, // Program No
+        { wch: 18 }, // Setting Time
+        { wch: 18 }, // Cycle Time
+        { wch: 18 }, // Handling Time
+        { wch: 18 }, // Idle Time
+        { wch: 20 }, // Start Time
+        { wch: 20 }, // End Time
+        { wch: 18 }, // Total Production Hr
+        { wch: 16 }, // Total Working Hr
+        { wch: 20 }, // Supplier Name
+        { wch: 15 }, // Material Grade
+        { wch: 22 }, // Raw Material Price Per Kg
+        { wch: 18 }, // Raw Material Cost
+        { wch: 30 }, // Remarks
+      ];
+      
+      worksheet['!cols'] = columnWidths;
+      
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Production_Records');
-      XLSX.writeFile(workbook, 'production_records.xlsx');
+      
+      const fileName = `production_records_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
       
       toast({
         title: 'Success',
@@ -731,6 +740,115 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                 {filterOptions.jobOrders.map((jobOrder) => (
                   <SelectItem key={jobOrder} value={jobOrder}>
                     {jobOrder}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Customer Filter */}
+            <Select
+              value={tempFilters.customerName}
+              onValueChange={(value) => handleTempFilterChange('customerName', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Customers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {filterOptions.customers.map((customer) => (
+                  <SelectItem key={customer} value={customer}>
+                    {customer}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Supplier Filter */}
+            <Select
+              value={tempFilters.supplierName}
+              onValueChange={(value) => handleTempFilterChange('supplierName', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Suppliers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Suppliers</SelectItem>
+                {filterOptions.suppliers.map((supplier) => (
+                  <SelectItem key={supplier} value={supplier}>
+                    {supplier}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Price and Cost Filters Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            {/* Raw Material Price Per Kg Min */}
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Min Price Per Kg (₹)
+              </label>
+              <Input
+                type="number"
+                placeholder="Min price"
+                value={tempFilters.rawMaterialPricePerKgMin}
+                onChange={(e) => handleTempFilterChange('rawMaterialPricePerKgMin', e.target.value)}
+              />
+            </div>
+
+            {/* Raw Material Price Per Kg Max */}
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Max Price Per Kg (₹)
+              </label>
+              <Input
+                type="number"
+                placeholder="Max price"
+                value={tempFilters.rawMaterialPricePerKgMax}
+                onChange={(e) => handleTempFilterChange('rawMaterialPricePerKgMax', e.target.value)}
+              />
+            </div>
+
+            {/* Raw Material Cost Min */}
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Min Material Cost (₹)
+              </label>
+              <Input
+                type="number"
+                placeholder="Min cost"
+                value={tempFilters.rawMaterialCostMin}
+                onChange={(e) => handleTempFilterChange('rawMaterialCostMin', e.target.value)}
+              />
+            </div>
+
+            {/* Raw Material Cost Max */}
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Max Material Cost (₹)
+              </label>
+              <Input
+                type="number"
+                placeholder="Max cost"
+                value={tempFilters.rawMaterialCostMax}
+                onChange={(e) => handleTempFilterChange('rawMaterialCostMax', e.target.value)}
+              />
+            </div>
+
+            {/* Material Grade Filter */}
+            <Select
+              value={tempFilters.materialGrade}
+              onValueChange={(value) => handleTempFilterChange('materialGrade', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Material Grades" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Material Grades</SelectItem>
+                {filterOptions.materialGrades.map((grade) => (
+                  <SelectItem key={grade} value={grade}>
+                    {grade}
                   </SelectItem>
                 ))}
               </SelectContent>

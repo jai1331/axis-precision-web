@@ -129,8 +129,35 @@ export default function Dashboard() {
             operatorName: item.operatorName || 'Unknown',
             qty: item.qty || 0,
             totalQty: item.totalQty || item.qty || 0,
-            shift: item.shift || 'Unknown'
+            shift: item.shift || 'Unknown',
+            // Add admin entry data to production records
+            supplierName: 'Unknown',
+            rawMaterialPricePerKg: 0,
+            materialGrade: 'Unknown',
+            rawMaterialCost: 0,
+            internalJobOrder: '',
           }));
+          
+          // Merge with admin entry data
+          finalData = finalData.map((item: any) => {
+            const adminEntry = customerData.find((admin: any) => 
+              admin.customerName === item.customerName && 
+              admin.componentName === item.componentName
+            );
+            
+            if (adminEntry) {
+              return {
+                ...item,
+                supplierName: adminEntry.supplierName || 'Unknown',
+                rawMaterialPricePerKg: adminEntry.rawMaterialPricePerKg || 0,
+                materialGrade: adminEntry.materialGrade || 'Unknown',
+                rawMaterialCost: adminEntry.rawMaterialCost || 0,
+                internalJobOrder: adminEntry.internalJobOrder || '',
+              };
+            }
+            
+            return item;
+          });
         }
 
         // Calculate dashboard summary - matches React Native logic exactly
@@ -354,24 +381,83 @@ export default function Dashboard() {
   const handleExportExcel = () => {
     try {
       const exportData = filteredData.map(item => ({
-        'Customer Name': item.customerName,
+        'Date of Entry': new Date(item.dateOfEntry).toLocaleDateString('en-IN'),
         'Component Name': item.componentName,
+        'Customer Name': item.customerName,
+        'Internal Job Order': item.internalJobOrder || '',
         'Machine Name': item.machineName,
         'Operator Name': item.operatorName,
         'Shift': item.shift,
         'Quantity': item.qty,
-        'Total Quantity': item.totalQty,
+        'Additional Qty': item.additionalQty || 0,
+        'Total Qty': item.totalQty,
+        'OPN': item.opn || '',
+        'Program No': item.progNo || '',
+        'Setting Time (HH:MM:SS)': item.settingTime || '00:00:00',
+        'Cycle Time (HH:MM:SS)': item.cycleTime || '00:00:00',
+        'Handling Time (HH:MM:SS)': item.handlingTime || '00:00:00',
+        'Idle Time (HH:MM:SS)': item.idleTime || '00:00:00',
+        'Start Time': typeof item.startTime === 'string' ? item.startTime : new Date(item.startTime).toLocaleString('en-IN'),
+        'End Time': typeof item.endTime === 'string' ? item.endTime : new Date(item.endTime).toLocaleString('en-IN'),
         'Production Hours': item.totalProductionHr,
         'Working Hours': item.totalWorkingHr,
-        'Date of Entry': new Date(item.dateOfEntry).toLocaleDateString(),
+        'Supplier Name': item.supplierName || '',
+        'Material Grade': item.materialGrade || '',
+        'Raw Material Price Per Kg': item.rawMaterialPricePerKg || 0,
+        'Raw Material Cost': item.rawMaterialCost || 0,
+        'Remarks': item.remarks || '',
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths for better spacing
+      const columnWidths = [
+        { wch: 12 }, // Date of Entry
+        { wch: 25 }, // Component Name
+        { wch: 20 }, // Customer Name
+        { wch: 18 }, // Internal Job Order
+        { wch: 12 }, // Machine Name
+        { wch: 15 }, // Operator Name
+        { wch: 10 }, // Shift
+        { wch: 10 }, // Quantity
+        { wch: 12 }, // Additional Qty
+        { wch: 10 }, // Total Qty
+        { wch: 8 },  // OPN
+        { wch: 12 }, // Program No
+        { wch: 18 }, // Setting Time
+        { wch: 18 }, // Cycle Time
+        { wch: 18 }, // Handling Time
+        { wch: 18 }, // Idle Time
+        { wch: 20 }, // Start Time
+        { wch: 20 }, // End Time
+        { wch: 16 }, // Production Hours
+        { wch: 14 }, // Working Hours
+        { wch: 20 }, // Supplier Name
+        { wch: 15 }, // Material Grade
+        { wch: 22 }, // Raw Material Price Per Kg
+        { wch: 18 }, // Raw Material Cost
+        { wch: 30 }, // Remarks
+      ];
+      
+      worksheet['!cols'] = columnWidths;
+      
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Dashboard_Data');
-      XLSX.writeFile(workbook, 'dashboard_production_data.xlsx');
+      
+      const fileName = `dashboard_production_data_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+      
+      toast({
+        title: 'Success',
+        description: 'Excel file downloaded successfully',
+      });
     } catch (error) {
       console.error('Export failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to download Excel file',
+        variant: 'destructive',
+      });
     }
   };
 

@@ -159,8 +159,11 @@ export default function DataTable() {
   const handleExportToExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(
       filteredEntries.map(entry => ({
-        'Customer Name': entry.customerName,
+        'Date of Entry': new Date(entry.dateOfEntry).toLocaleDateString('en-IN'),
         'Component Name': entry.componentName,
+        'Customer Name': entry.customerName,
+        'Internal Job Order': entry.internalJobOrder || '',
+        'DC Number': entry.dcno,
         'Supplier Name': entry.supplierName,
         'Material Grade': entry.materialGrade,
         'Raw Material Price Per Kg': entry.rawMaterialPricePerKg,
@@ -171,24 +174,57 @@ export default function DataTable() {
         'Quantity': entry.qty,
         'Additional Qty': entry.additionalQty || 0,
         'Total Qty': entry.totalQty,
-        'DC Number': entry.dcno,
-        'Internal Job Order': entry.internalJobOrder || '',
         'OPN': entry.opn,
         'Program Number': entry.progNo,
-        'Setting Time': entry.settingTime,
-        'Cycle Time': entry.cycleTime,
-        'Handling Time': entry.handlingTime,
-        'Idle Time': entry.idleTime,
+        'Setting Time (HH:MM:SS)': entry.settingTime || '00:00:00',
+        'Cycle Time (HH:MM:SS)': entry.cycleTime || '00:00:00',
+        'Handling Time (HH:MM:SS)': entry.handlingTime || '00:00:00',
+        'Idle Time (HH:MM:SS)': entry.idleTime || '00:00:00',
+        'Start Time': typeof entry.startTime === 'string' ? entry.startTime : new Date(entry.startTime).toLocaleString('en-IN'),
+        'End Time': typeof entry.endTime === 'string' ? entry.endTime : new Date(entry.endTime).toLocaleString('en-IN'),
         'Total Production Hr': entry.totalProductionHr,
         'Total Working Hr': entry.totalWorkingHr,
-        'Date of Entry': new Date(entry.dateOfEntry).toLocaleDateString(),
         'Remarks': entry.remarks || '',
       }))
     );
     
+    // Set column widths for better spacing
+    const columnWidths = [
+      { wch: 12 }, // Date of Entry
+      { wch: 25 }, // Component Name
+      { wch: 20 }, // Customer Name
+      { wch: 18 }, // Internal Job Order
+      { wch: 12 }, // DC Number
+      { wch: 20 }, // Supplier Name
+      { wch: 15 }, // Material Grade
+      { wch: 22 }, // Raw Material Price Per Kg
+      { wch: 18 }, // Raw Material Cost
+      { wch: 12 }, // Machine Name
+      { wch: 15 }, // Operator Name
+      { wch: 10 }, // Shift
+      { wch: 10 }, // Quantity
+      { wch: 12 }, // Additional Qty
+      { wch: 10 }, // Total Qty
+      { wch: 8 },  // OPN
+      { wch: 12 }, // Program Number
+      { wch: 18 }, // Setting Time
+      { wch: 18 }, // Cycle Time
+      { wch: 18 }, // Handling Time
+      { wch: 18 }, // Idle Time
+      { wch: 20 }, // Start Time
+      { wch: 20 }, // End Time
+      { wch: 18 }, // Total Production Hr
+      { wch: 16 }, // Total Working Hr
+      { wch: 30 }, // Remarks
+    ];
+    
+    worksheet['!cols'] = columnWidths;
+    
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Production_Entries');
-    XLSX.writeFile(workbook, 'production_entries.xlsx');
+    
+    const fileName = `production_entries_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
   };
   
   const filteredEntries = searchQuery
