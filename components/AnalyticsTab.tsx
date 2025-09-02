@@ -45,8 +45,6 @@ import { addTimes, getEmployeeData, formatDate, getCustomerList } from '@/lib/ut
 import moment from 'moment';
 import * as XLSX from 'xlsx';
 
-
-
 interface AnalyticsTabProps {
   productionData?: any[];
   loading?: boolean;
@@ -122,6 +120,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     rawMaterialCostMax: '',
   });
 
+  // Add this state to track filter application
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+
   useEffect(() => {
     fetchAdminEntries();
   }, []);
@@ -196,131 +197,59 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   }, [productionData, externalLoading]);
 
   useEffect(() => {
-    applyFilters();
-  }, [records, filters, dashboardData]);
+    if (!isApplyingFilters && records.length > 0) {
+      applyFilters();
+    }
+  }, [records, filters]); // Remove dashboardData dependency
 
   // Extract filter options from records
   useEffect(() => {
-    if (records.length > 0 && adminEntries.length > 0) {
+    if (records.length > 0) {
+      // Get unique job orders from actual records, filtering out empty strings
+      const uniqueJobOrders = [...new Set(
+        records
+          .map(record => record.internalJobOrder)
+          .filter(jobOrder => jobOrder && jobOrder.trim() !== '')
+      )].sort();
+  
+      console.log('Available job orders in records:', uniqueJobOrders);
+  
       const uniqueCustomers = [...new Set(records.map(record => record.customerName))].sort();
       const uniqueSuppliers = [...new Set(records.map(record => record.supplierName))].sort();
-      const uniqueJobOrders = [...new Set(adminEntries.map(admin => admin.internalJobOrder).filter((jobOrder): jobOrder is string => Boolean(jobOrder)))].sort();
-      const uniqueMaterialGrades = [...new Set(adminEntries.map(admin => admin.materialGrade).filter((grade): grade is string => Boolean(grade)))].sort();
+      const uniqueMaterialGrades = [...new Set(records.map(record => record.materialGrade))].sort();
       
       setFilterOptions({
         customers: uniqueCustomers,
         suppliers: uniqueSuppliers,
-        jobOrders: uniqueJobOrders,
+        jobOrders: uniqueJobOrders.filter((jobOrder): jobOrder is string => jobOrder !== undefined), // Use job orders from actual records
         materialGrades: uniqueMaterialGrades,
       });
     }
-  }, [records, adminEntries]);
+  }, [records]); // Remove adminEntries dependency since we're not using it here
 
+  // Update the applyFilters function
   const applyFilters = () => {
+    // Prevent double execution
+    if (isApplyingFilters) {
+      console.log('Filter application already in progress, skipping...');
+      return;
+    }
+
+    setIsApplyingFilters(true);
+    console.log('=== Starting Filter Application ===');
+    console.log('Current filters:', filters);
+    console.log('Total records before filtering:', records.length);
+
     let filtered = [...records];
 
-    // Apply search filter
-    if (filters.search) {
-      filtered = filtered.filter(record =>
-        record.componentName.toLowerCase().includes(filters.search.toLowerCase()) ||
-        record.customerName.toLowerCase().includes(filters.search.toLowerCase()) ||
-        record.machineName.toLowerCase().includes(filters.search.toLowerCase()) ||
-        record.operatorName.toLowerCase().includes(filters.search.toLowerCase())
-      );
-    }
-
-    // Apply job order filter
+    // Apply job order filter with exact matching
     if (filters.internalJobOrder && filters.internalJobOrder !== 'all') {
-      filtered = filtered.filter(record => 
-        record.internalJobOrder && 
-        record.internalJobOrder.toLowerCase().includes(filters.internalJobOrder.toLowerCase())
-      );
+      console.log('Applying job order filter:', filters.internalJobOrder);
+      filtered = filtered.filter(record => record.internalJobOrder === filters.internalJobOrder);
+      console.log('Records after job order filter:', filtered.length);
     }
 
-    // Apply customer filter
-    if (filters.customerName && filters.customerName !== 'all') {
-      filtered = filtered.filter(record => 
-        record.customerName.toLowerCase().includes(filters.customerName.toLowerCase())
-      );
-    }
-
-    // Apply supplier filter
-    if (filters.supplierName && filters.supplierName !== 'all') {
-      filtered = filtered.filter(record => 
-        record.supplierName.toLowerCase().includes(filters.supplierName.toLowerCase())
-      );
-    }
-
-    // Apply material grade filter
-    if (filters.materialGrade && filters.materialGrade !== 'all') {
-      filtered = filtered.filter(record => 
-        record.materialGrade && 
-        record.materialGrade.toLowerCase().includes(filters.materialGrade.toLowerCase())
-      );
-    }
-
-    // Apply raw material price per kg filter
-    if (filters.rawMaterialPricePerKgMin || filters.rawMaterialPricePerKgMax) {
-      filtered = filtered.filter(record => {
-        const price = record.rawMaterialPricePerKg || 0;
-        const minPrice = filters.rawMaterialPricePerKgMin ? parseFloat(filters.rawMaterialPricePerKgMin) : 0;
-        const maxPrice = filters.rawMaterialPricePerKgMax ? parseFloat(filters.rawMaterialPricePerKgMax) : Infinity;
-        return price >= minPrice && price <= maxPrice;
-      });
-    }
-
-    // Apply raw material cost filter
-    if (filters.rawMaterialCostMin || filters.rawMaterialCostMax) {
-      filtered = filtered.filter(record => {
-        const cost = record.rawMaterialCost || 0;
-        const minCost = filters.rawMaterialCostMin ? parseFloat(filters.rawMaterialCostMin) : 0;
-        const maxCost = filters.rawMaterialCostMax ? parseFloat(filters.rawMaterialCostMax) : Infinity;
-        return cost >= minCost && cost <= maxCost;
-      });
-    }
-
-    // Apply date range filter
-    if (filters.startDate) {
-      const startDate = new Date(filters.startDate);
-      filtered = filtered.filter(record => new Date(record.dateOfEntry) >= startDate);
-    }
-
-    if (filters.endDate) {
-      const endDate = new Date(filters.endDate);
-      filtered = filtered.filter(record => new Date(record.dateOfEntry) <= endDate);
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let aValue: any, bValue: any;
-
-      switch (filters.sortBy) {
-        case 'componentName':
-          aValue = a.componentName;
-          bValue = b.componentName;
-          break;
-        case 'customerName':
-          aValue = a.customerName;
-          bValue = b.customerName;
-          break;
-        case 'machineName':
-          aValue = a.machineName;
-          bValue = b.machineName;
-          break;
-        case 'dateOfEntry':
-        default:
-          aValue = new Date(a.dateOfEntry);
-          bValue = new Date(b.dateOfEntry);
-          break;
-      }
-
-      if (filters.sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-
+    // Update filtered records
     setFilteredRecords(filtered);
     setTotalRecords(filtered.length);
     setTotalPages(Math.ceil(filtered.length / itemsPerPage));
@@ -328,6 +257,11 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
     // Calculate summary data
     calculateSummaryData(filtered);
+    
+    console.log('=== Filter Application Complete ===');
+    console.log('Final filtered records count:', filtered.length);
+    
+    setIsApplyingFilters(false);
   };
 
   const calculateSummaryData = (data: ProductionRecord[]) => {
@@ -403,9 +337,18 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     }));
   };
 
+  // Update the saveFilters function
   const saveFilters = () => {
+    console.log('=== Saving Filters ===');
+    console.log('Previous filters:', filters);
+    console.log('New filters to apply:', tempFilters);
+    
     setFilters(tempFilters);
     setSavedFilters(tempFilters);
+    
+    // Remove the setTimeout and directly call applyFilters
+    // applyFilters();
+
     toast({
       title: 'Success',
       description: 'Filters applied successfully',
@@ -556,6 +499,37 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   // Get paginated records
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedRecords = filteredRecords.slice(startIndex, startIndex + itemsPerPage);
+
+  useEffect(() => {
+    console.log('=== Processing Production Data ===');
+    console.log('Production data length:', productionData?.length);
+    
+    if (productionData && productionData.length > 0) {
+      const allRecords = productionData.map((record: any) => {
+        const adminEntry = adminEntries.find((admin: any) => 
+          admin.customerName === record.customerName && 
+          admin.componentName === record.componentName
+        );
+        
+        const internalJobOrder = adminEntry?.internalJobOrder || record.internalJobOrder || '';
+        
+        console.log('Processing record:', {
+          componentName: record.componentName,
+          internalJobOrder,
+          originalJobOrder: record.internalJobOrder,
+          adminJobOrder: adminEntry?.internalJobOrder
+        });
+
+        return {
+          ...record,
+          internalJobOrder,
+        };
+      });
+
+      console.log('Sample processed records:', allRecords.slice(0, 3));
+      setRecords(allRecords);
+    }
+  }, [productionData, adminEntries]);
 
   return (
     <div className="space-y-6">
