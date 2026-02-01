@@ -312,46 +312,56 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    console.log('Filters updated:', filters);
     applyFilters();
   }, [filters, productionData]);
 
   const applyFilters = () => {
+    console.log('Applying filters:', filters);
     let filtered = [...productionData];
 
     // Apply search filter
     if (filters.search) {
-      filtered = filtered.filter(item =>
-        item.customerName.toLowerCase().includes(filters.search.toLowerCase()) ||
-        item.componentName.toLowerCase().includes(filters.search.toLowerCase()) ||
-        item.machineName.toLowerCase().includes(filters.search.toLowerCase()) ||
-        item.operatorName.toLowerCase().includes(filters.search.toLowerCase())
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(
+        (item) =>
+          item.customerName.toLowerCase().includes(searchTerm) ||
+          item.componentName.toLowerCase().includes(searchTerm) ||
+          item.machineName.toLowerCase().includes(searchTerm) ||
+          item.operatorName.toLowerCase().includes(searchTerm)
       );
     }
 
     // Apply customer filter
     if (filters.customer && filters.customer !== 'all') {
-      filtered = filtered.filter(item => item.customerName === filters.customer);
+      filtered = filtered.filter((item) => item.customerName === filters.customer);
     }
 
     // Apply component filter
     if (filters.component && filters.component !== 'all') {
-      filtered = filtered.filter(item => item.componentName === filters.component);
+      filtered = filtered.filter((item) => item.componentName === filters.component);
     }
 
     // Apply machine filter
     if (filters.machine && filters.machine !== 'all') {
-      filtered = filtered.filter(item => item.machineName === filters.machine);
+      filtered = filtered.filter((item) => item.machineName === filters.machine);
     }
 
     // Apply date range filter
     if (filters.startDate) {
       const startDate = new Date(filters.startDate);
-      filtered = filtered.filter(item => new Date(item.dateOfEntry) >= startDate);
+      filtered = filtered.filter((item) => {
+        const entryDate = new Date(item.dateOfEntry);
+        return entryDate.toISOString().split('T')[0] >= startDate.toISOString().split('T')[0];
+      });
     }
 
     if (filters.endDate) {
       const endDate = new Date(filters.endDate);
-      filtered = filtered.filter(item => new Date(item.dateOfEntry) <= endDate);
+      filtered = filtered.filter((item) => {
+        const entryDate = new Date(item.dateOfEntry);
+        return entryDate.toISOString().split('T')[0] <= endDate.toISOString().split('T')[0];
+      });
     }
 
     setFilteredData(filtered);
@@ -362,6 +372,7 @@ export default function Dashboard() {
   };
 
   const saveFilters = () => {
+    console.log('Saving filters:', tempFilters);
     setFilters(tempFilters);
   };
 
@@ -518,6 +529,38 @@ export default function Dashboard() {
   const hasUnsavedChanges = JSON.stringify(tempFilters) !== JSON.stringify(filters);
 
   console.log('Dashboard productionData length:', productionData?.length || 0);
+
+  const transformMachineData = (data: any[]) => {
+    const machineData: any = {};
+
+    data.forEach((item) => {
+      const machine = item.machineName || 'Unknown';
+      if (!machineData[machine]) {
+        machineData[machine] = {
+          productionHrs: '00:00:00',
+          workingHrs: '00:00:00',
+          idleHrs: '00:00:00',
+          qty: 0,
+        };
+      }
+
+      machineData[machine].productionHrs = addTimes(
+        machineData[machine].productionHrs,
+        item.totalProductionHr || '00:00:00'
+      );
+      machineData[machine].workingHrs = addTimes(
+        machineData[machine].workingHrs,
+        item.totalWorkingHr || '00:00:00'
+      );
+      machineData[machine].idleHrs = addTimes(
+        machineData[machine].idleHrs,
+        item.idleTime || '00:00:00'
+      );
+      machineData[machine].qty += item.qty || 0;
+    });
+
+    return machineData;
+  };
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -684,37 +727,45 @@ export default function Dashboard() {
 
           <h4 className="text-3xl font-bold tracking-tight">Machine(s)</h4>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Dynamic Machine Cards */}
             {loading ? (
               // Loading skeletons
               Array.from({ length: 4 }).map((_, index) => (
                 <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <Skeleton className="h-4 w-16" />
-                <Factory className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                  <Skeleton className="h-8 w-[100px]" />
-              </CardContent>
-            </Card>
+                    <Factory className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-[100px]" />
+                  </CardContent>
+                </Card>
               ))
             ) : (
-              // Real machine data
-              Object.entries(data?.machineData || {}).map(([machineName, machineInfo]: [string, any]) => (
+              // Dynamically compute machine data based on filters
+              Object.entries(
+                filteredData.length > 0
+                  ? transformMachineData(filteredData)
+                  : data?.machineData || {}
+              ).map(([machineName, machineInfo]: [string, any]) => (
                 <Card key={machineName}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">{machineName}</CardTitle>
-                <Factory className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                  <div className="space-y-1">
-                      <div className="text-2xl font-bold">{formatTimeForDisplay(machineInfo.productionHrs)}</div>
-                    <p className="text-xs text-muted-foreground">
-                        Production time : {formatTimeForDisplay(getMachineHrsAccurate(machineName) || '00:00:00')}
-                    </p>
-                  </div>
-              </CardContent>
-            </Card>
+                    <Factory className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      <div className="text-2xl font-bold">
+                        {formatTimeForDisplay(machineInfo.productionHrs)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Production time: {formatTimeForDisplay(machineInfo.productionHrs)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Accurate Machine Hours: {getMachineHrsAccurate(machineName)}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               ))
             )}
           </div>
@@ -724,9 +775,7 @@ export default function Dashboard() {
             {/* Total Production Hour */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Production Hour
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Total Production Hour</CardTitle>
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -734,10 +783,16 @@ export default function Dashboard() {
                   <Skeleton className="h-8 w-[100px]" />
                 ) : (
                   <div className="space-y-1">
-                    <div className="text-2xl font-bold">{data?.productionHrs}</div>
-                    <p className="text-xs text-muted-foreground">
-                      Total across all machines
-                    </p>
+                    <div className="text-2xl font-bold">
+                      {formatTimeForDisplay(
+                        (filteredData.length > 0 ? filteredData : productionData).reduce(
+                          (acc: string, item: any) =>
+                            addTimes(acc, item.totalProductionHr || '00:00:00'),
+                          '00:00:00'
+                        )
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Total across all machines</p>
                   </div>
                 )}
               </CardContent>
@@ -746,9 +801,7 @@ export default function Dashboard() {
             {/* Total Idle Hour */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Idle Hour
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Total Idle Hour</CardTitle>
                 <AlertCircle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -756,10 +809,16 @@ export default function Dashboard() {
                   <Skeleton className="h-8 w-[100px]" />
                 ) : (
                   <div className="space-y-1">
-                    <div className="text-2xl font-bold">{data?.idleHrs}hr</div>
-                    <p className="text-xs text-muted-foreground">
-                      Downtime across machines
-                    </p>
+                    <div className="text-2xl font-bold">
+                      {formatTimeForDisplay(
+                        (filteredData.length > 0 ? filteredData : productionData).reduce(
+                          (acc: string, item: any) =>
+                            addTimes(acc, item.idleTime || '00:00:00'),
+                          '00:00:00'
+                        )
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Downtime across machines</p>
                   </div>
                 )}
               </CardContent>
@@ -768,9 +827,7 @@ export default function Dashboard() {
             {/* Total Working Hour */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Working Hour
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Total Working Hour</CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -778,10 +835,16 @@ export default function Dashboard() {
                   <Skeleton className="h-8 w-[100px]" />
                 ) : (
                   <div className="space-y-1">
-                    <div className="text-2xl font-bold">{data?.workingHrs}</div>
-                    <p className="text-xs text-muted-foreground">
-                      Effective working time
-                    </p>
+                    <div className="text-2xl font-bold">
+                      {formatTimeForDisplay(
+                        (filteredData.length > 0 ? filteredData : productionData).reduce(
+                          (acc: string, item: any) =>
+                            addTimes(acc, item.totalWorkingHr || '00:00:00'),
+                          '00:00:00'
+                        )
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Effective working time</p>
                   </div>
                 )}
               </CardContent>
@@ -790,9 +853,7 @@ export default function Dashboard() {
             {/* Efficiency */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Overall Efficiency
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Overall Efficiency</CardTitle>
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -802,21 +863,31 @@ export default function Dashboard() {
                   <div className="space-y-1">
                     <div className="text-2xl font-bold">
                       {(() => {
-                        const workingHrs = parseFormattedTime(data?.workingHrs || '0hr 0mins');
-                        const productionHrs = parseFormattedTime(data?.productionHrs || '0hr 0mins');
-                        return workingHrs > 0 ? ((productionHrs / workingHrs) * 100).toFixed(1) : '0.0';
-                      })()}%
+                        const dataToUse = filteredData.length > 0 ? filteredData : productionData;
+                        const totalWorkingHrs = dataToUse.reduce(
+                          (acc: string, item: any) =>
+                            addTimes(acc, item.totalWorkingHr || '00:00:00'),
+                          '00:00:00'
+                        );
+                        const totalProductionHrs = dataToUse.reduce(
+                          (acc: string, item: any) =>
+                            addTimes(acc, item.totalProductionHr || '00:00:00'),
+                          '00:00:00'
+                        );
+                        const workingHrs = parseFormattedTime(totalWorkingHrs);
+                        const productionHrs = parseFormattedTime(totalProductionHrs);
+                        return workingHrs > 0
+                          ? ((productionHrs / workingHrs) * 100).toFixed(1)
+                          : '0.0';
+                      })()}
+                      %
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Production efficiency
-                    </p>
+                    <p className="text-xs text-muted-foreground">Production efficiency</p>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
-
-       
 
           <div className="grid gap-4 md:grid-cols-2">
             {/* Component Production Hours by Machine */}
@@ -828,14 +899,15 @@ export default function Dashboard() {
               <CardContent className="pl-2">
                 {loading ? (
                   <Skeleton className="h-[350px] w-full" />
-                ) : 
-                (
+                ) : (
                   <ResponsiveContainer width="100%" height={350}>
                     <BarChart
-                      data={Object.entries(data?.machineData || {}).map(([name, info]: [string, any]) => ({
+                      data={Object.entries(
+                        filteredData.length > 0 ? transformMachineData(filteredData) : data?.machineData || {}
+                      ).map(([name, info]: [string, any]) => ({
                         name,
                         hours: timeToHours(info.productionHrs),
-                        components: info.qty
+                        components: info.qty,
                       }))}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
@@ -871,10 +943,11 @@ export default function Dashboard() {
                           const workingHrs = timeToHours(info.workingHrs);
                           const productionHrs = timeToHours(info.productionHrs);
                           const efficiency = workingHrs > 0 ? (productionHrs / workingHrs) * 100 : 0;
+
                           return {
                             name,
                             value: Math.round(efficiency),
-                            fill: CHART_COLORS[index % CHART_COLORS.length]
+                            fill: CHART_COLORS[index % CHART_COLORS.length],
                           };
                         })}
                         cx="50%"
@@ -896,7 +969,7 @@ export default function Dashboard() {
 
         <TabsContent value="production" className="space-y-4">
           <AnalyticsTab 
-            productionData={productionData} 
+            productionData={filteredData.length > 0 ? filteredData : productionData} // Use filteredData if available, otherwise fallback to productionData
             loading={loading}
             dashboardData={data}
           />

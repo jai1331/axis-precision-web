@@ -234,35 +234,64 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       console.log('Filter application already in progress, skipping...');
       return;
     }
-
+  
     setIsApplyingFilters(true);
     console.log('=== Starting Filter Application ===');
     console.log('Current filters:', filters);
     console.log('Total records before filtering:', records.length);
-
+  
     let filtered = [...records];
-
-    // Apply job order filter with exact matching
-    if (filters.internalJobOrder && filters.internalJobOrder !== 'all') {
-      console.log('Applying job order filter:', filters.internalJobOrder);
-      filtered = filtered.filter(record => record.internalJobOrder === filters.internalJobOrder);
-      console.log('Records after job order filter:', filtered.length);
+  
+    // Apply search filter
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(
+        (record) =>
+          record.componentName.toLowerCase().includes(searchTerm) ||
+          record.customerName.toLowerCase().includes(searchTerm) ||
+          record.machineName.toLowerCase().includes(searchTerm)
+      );
     }
-
+  
+    // Apply date range filter
+    if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      filtered = filtered.filter((record) => {
+        const entryDate = new Date(record.dateOfEntry);
+        return entryDate >= startDate;
+      });
+    }
+  
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      filtered = filtered.filter((record) => {
+        const entryDate = new Date(record.dateOfEntry);
+        return entryDate <= endDate;
+      });
+    }
+  
+    // Apply internal job order filter
+    if (filters.internalJobOrder && filters.internalJobOrder !== 'all') {
+      filtered = filtered.filter(
+        (record) => record.internalJobOrder === filters.internalJobOrder
+      );
+    }
+  
     // Update filtered records
     setFilteredRecords(filtered);
     setTotalRecords(filtered.length);
     setTotalPages(Math.ceil(filtered.length / itemsPerPage));
     setCurrentPage(1);
-
+  
     // Calculate summary data
     calculateSummaryData(filtered);
-    
+  
     console.log('=== Filter Application Complete ===');
     console.log('Final filtered records count:', filtered.length);
-    
+  
     setIsApplyingFilters(false);
   };
+  
 
   const calculateSummaryData = (data: ProductionRecord[]) => {
     // Use dashboard data if available, otherwise calculate from records
@@ -342,12 +371,13 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     console.log('=== Saving Filters ===');
     console.log('Previous filters:', filters);
     console.log('New filters to apply:', tempFilters);
-    
+
+    // Update the filters state
     setFilters(tempFilters);
     setSavedFilters(tempFilters);
-    
-    // Remove the setTimeout and directly call applyFilters
-    // applyFilters();
+
+    // Trigger the applyFilters function immediately
+    applyFilters();
 
     toast({
       title: 'Success',
@@ -371,9 +401,15 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       rawMaterialCostMin: '',
       rawMaterialCostMax: '',
     };
+
+    // Reset all filters to default
     setTempFilters(defaultFilters);
     setFilters(defaultFilters);
     setSavedFilters(defaultFilters);
+
+    // Trigger applyFilters to reset the filtered records
+    applyFilters();
+
     toast({
       title: 'Success',
       description: 'Filters reset successfully',
