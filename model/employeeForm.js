@@ -19,7 +19,8 @@ const employeeFormSchema = new mongoose.Schema(
         startTime: { type: String, required: true },
         endTime: { type: String, required: true },
         remarks: { type: String },
-        created: { type: Date, default: Date.now() }
+        created: { type: Date, default: Date.now() },
+        internalJobOrder: { type: String, required: true },
 	},
 	{ collection: 'employeeForm' }
 )

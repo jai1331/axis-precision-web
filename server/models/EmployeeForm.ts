@@ -98,6 +98,7 @@ const EmployeeFormSchema: Schema = new Schema(
       type: Date,
       default: Date.now,
     },
+    internalJobOrder: { type: String, required: true },
   },
   {
     timestamps: true,

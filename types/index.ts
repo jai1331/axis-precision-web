@@ -105,6 +105,7 @@ export interface ProductionFilters {
   rawMaterialPricePerKgMax: string;
   rawMaterialCostMin: string;
   rawMaterialCostMax: string;
+  opn: string; // Add opn property
 }
 
 export interface EmployeeForm {
@@ -126,4 +127,5 @@ export interface EmployeeForm {
   remarks?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  internalJobOrder: string;
 }

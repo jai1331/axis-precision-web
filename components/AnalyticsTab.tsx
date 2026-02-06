@@ -51,6 +51,12 @@ interface AnalyticsTabProps {
   dashboardData?: any;
 }
 
+const timeStringToHours = (time: string): number => {
+  if (!time) return 0; // Handle empty or invalid time strings
+  const [hours, minutes, seconds] = time.split(':').map(Number);
+  return hours + minutes / 60 + seconds / 3600;
+};
+
 export default function AnalyticsTab({ productionData = [], loading: externalLoading = false, dashboardData }: AnalyticsTabProps) {
   const [records, setRecords] = useState<ProductionRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<ProductionRecord[]>([]);
@@ -67,6 +73,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     suppliers: [] as string[],
     jobOrders: [] as string[],
     materialGrades: [] as string[],
+    opns: [] as string[], // Add opns here
   });
   const { toast } = useToast();
 
@@ -86,6 +93,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     rawMaterialPricePerKgMax: '',
     rawMaterialCostMin: '',
     rawMaterialCostMax: '',
+    opn: 'all', // Add opn filter
   });
 
   const [savedFilters, setSavedFilters] = useState<ProductionFilters>({
@@ -102,6 +110,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     rawMaterialPricePerKgMax: '',
     rawMaterialCostMin: '',
     rawMaterialCostMax: '',
+    opn: 'all', // Add opn filter
   });
 
   const [tempFilters, setTempFilters] = useState<ProductionFilters>({
@@ -118,6 +127,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     rawMaterialPricePerKgMax: '',
     rawMaterialCostMin: '',
     rawMaterialCostMax: '',
+    opn: 'all', // Add opn filter
   });
 
   // Add this state to track filter application
@@ -130,6 +140,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const fetchAdminEntries = async () => {
     try {
       const data = await getCustomerList();
+      console.log('Fetched admin entries:', data);
       setAdminEntries(data);
     } catch (error) {
       console.error('Error fetching admin entries:', error);
@@ -139,17 +150,21 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   useEffect(() => {
     console.log('AnalyticsTab received productionData:', productionData);
     console.log('AnalyticsTab externalLoading:', externalLoading);
-    
+
+    if(adminEntries.length === 0) { return; }
+
     if (productionData && productionData.length > 0) {
       console.log('Processing production data, length:', productionData.length);
+
       // Process production data to match ProductionRecord interface
       const allRecords = productionData.map((record: any) => {
         // Find matching admin entry for additional data
-        const adminEntry = adminEntries.find((admin: any) => 
-          admin.customerName === record.customerName && 
-          admin.componentName === record.componentName
+        const adminEntry = adminEntries.find((admin: any) =>
+          (admin.customerName === record.customerName &&
+          admin.componentName === record.componentName) &&
+          (admin.internalJobOrder === record.internalJobOrder || !record.internalJobOrder) // Match job order if available, otherwise ignore
         );
-        
+
         return {
           _id: record._id || record.id,
           componentName: record.componentName || 'Unknown',
@@ -174,10 +189,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
           dateOfEntry: new Date(record.dateOfEntry || record.date),
           createdAt: record.createdAt ? new Date(record.createdAt) : undefined,
           updatedAt: record.updatedAt ? new Date(record.updatedAt) : undefined,
-          supplierName: record.supplierName || 'Unknown',
-          rawMaterialPricePerKg: record.rawMaterialPricePerKg || 0,
-          materialGrade: record.materialGrade || 'Unknown',
-          rawMaterialCost: record.rawMaterialCost || 0,
+          supplierName: adminEntry?.supplierName || 'Unknown',
+          rawMaterialPricePerKg: adminEntry?.rawMaterialPricePerKg || 0,
+          materialGrade: adminEntry?.materialGrade || 'Unknown',
+          rawMaterialCost: adminEntry?.rawMaterialCost || 0,
           internalJobOrder: adminEntry?.internalJobOrder || record.internalJobOrder || '',
         };
       });
@@ -194,7 +209,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       console.log('No production data and not loading');
       setLoading(false);
     }
-  }, [productionData, externalLoading]);
+  }, [productionData, adminEntries]);
 
   useEffect(() => {
     if (!isApplyingFilters && records.length > 0) {
@@ -205,27 +220,26 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   // Extract filter options from records
   useEffect(() => {
     if (records.length > 0) {
-      // Get unique job orders from actual records, filtering out empty strings
       const uniqueJobOrders = [...new Set(
         records
           .map(record => record.internalJobOrder)
           .filter(jobOrder => jobOrder && jobOrder.trim() !== '')
       )].sort();
   
-      console.log('Available job orders in records:', uniqueJobOrders);
-  
       const uniqueCustomers = [...new Set(records.map(record => record.customerName))].sort();
       const uniqueSuppliers = [...new Set(records.map(record => record.supplierName))].sort();
       const uniqueMaterialGrades = [...new Set(records.map(record => record.materialGrade))].sort();
-      
+      const uniqueOpns = [...new Set(records.map(record => record.opn))].sort(); // Extract unique opns
+  
       setFilterOptions({
         customers: uniqueCustomers,
         suppliers: uniqueSuppliers,
-        jobOrders: uniqueJobOrders.filter((jobOrder): jobOrder is string => jobOrder !== undefined), // Use job orders from actual records
+        jobOrders: uniqueJobOrders.filter((jobOrder): jobOrder is string => jobOrder !== undefined),
         materialGrades: uniqueMaterialGrades,
+        opns: uniqueOpns, // Set unique opns
       });
     }
-  }, [records]); // Remove adminEntries dependency since we're not using it here
+  }, [records]);
 
   // Update the applyFilters function
   const applyFilters = () => {
@@ -277,6 +291,13 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       );
     }
   
+    // Apply opn filter
+    if (filters.opn && filters.opn !== 'all') {
+      filtered = filtered.filter(
+        (record) => record.opn === filters.opn
+      );
+    }
+  
     // Update filtered records
     setFilteredRecords(filtered);
     setTotalRecords(filtered.length);
@@ -306,7 +327,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         totalIdleHr: dashboardData.idleHrs || '0:00',
         totalWorkingHr: dashboardData.workingHrs || '0:00',
       });
-      return;
+      if(!data.length) return;
     }
 
     if (!data.length) {
@@ -321,29 +342,29 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       });
       return;
     }
-
+  
     // Group by machine
     const tc1Records = data.filter(record => record.machineName === 'TC-1');
     const tc2Records = data.filter(record => record.machineName === 'TC-2');
     const vmcRecords = data.filter(record => record.machineName === 'VMC');
     const tc3Records = data.filter(record => record.machineName === 'TC-3');
-
+  
     // Calculate totals for each machine
-    const tc1Total = tc1Records.reduce((sum, record) => sum + record.totalProductionHr, 0);
-    const tc2Total = tc2Records.reduce((sum, record) => sum + record.totalProductionHr, 0);
-    const vmcTotal = vmcRecords.reduce((sum, record) => sum + record.totalProductionHr, 0);
-    const tc3Total = tc3Records.reduce((sum, record) => sum + record.totalProductionHr, 0);
-
+    const tc1Total = tc1Records.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
+    const tc2Total = tc2Records.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
+    const vmcTotal = vmcRecords.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
+    const tc3Total = tc3Records.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
+  
     const totalProduction = tc1Total + tc2Total + vmcTotal + tc3Total;
-    const totalIdle = data.reduce((sum, record) => sum + (record.idleTime / 60), 0); // Convert minutes to hours
-    const totalWorking = data.reduce((sum, record) => sum + record.totalWorkingHr, 0);
-
+    const totalIdle = data.reduce((sum, record) => sum + timeStringToHours(String(record.idleTime)), 0);
+    const totalWorking = data.reduce((sum, record) => sum + timeStringToHours(String(record.totalWorkingHr)), 0);
+  
     const formatHours = (hours: number) => {
       const h = Math.floor(hours);
       const m = Math.round((hours - h) * 60);
       return `${h}:${m.toString().padStart(2, '0')}`;
     };
-
+  
     setSummaryData({
       tc1: formatHours(tc1Total),
       tc2: formatHours(tc2Total),
@@ -400,6 +421,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       rawMaterialPricePerKgMax: '',
       rawMaterialCostMin: '',
       rawMaterialCostMax: '',
+      opn: 'all', // Add opn filter
     };
 
     // Reset all filters to default
@@ -618,7 +640,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       </div>
 
       {/* Job Order Summary Cards */}
-      {hasActiveFilters && (
+      {(hasActiveFilters || filters.internalJobOrder !== 'all') && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -755,9 +777,23 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               </SelectContent>
             </Select>
 
-            
-
-            
+            {/* OPN Filter */}
+            <Select
+              value={tempFilters.opn}
+              onValueChange={(value) => handleTempFilterChange('opn', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All OPNs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All OPNs</SelectItem>
+                {filterOptions.opns.map((opn) => (
+                  <SelectItem key={opn} value={opn}>
+                    {opn}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="mt-4 flex items-center justify-between">

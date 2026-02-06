@@ -52,6 +52,7 @@ const formSchema = z.object({
   startTime: z.string().min(1, 'Start time is required'),
   endTime: z.string().min(1, 'End time is required'),
   remarks: z.string().optional().or(z.literal('')),
+  internalJobOrder: z.string().min(1, 'Internal Job Order is required'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -126,6 +127,7 @@ export default function EmployeeEntryForm() {
     startTime: '01:00:AM',
     endTime: '01:00:PM',
     remarks: '',
+    internalJobOrder: '',
   };
 
   const form = useForm<FormValues>({
@@ -317,7 +319,7 @@ export default function EmployeeEntryForm() {
       console.log('Form errors:', form.formState.errors);
       
       // Validate required fields
-      if (!values.operatorName || !values.date || !values.customerName || !values.componentName) {
+      if (!values.operatorName || !values.date || !values.customerName || !values.componentName || !values.internalJobOrder) {
         toast({
           title: 'Validation Error',
           description: 'Please fill in all required fields',
@@ -804,15 +806,51 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
+              {/* Internal Job Order */}
+              <FormField
+                control={form.control}
+                name="internalJobOrder"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Internal Job Order</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      disabled={!watchedCustomer || customerAdminEntry.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-12">
+                          <SelectValue placeholder={!watchedCustomer ? "Select customer first" : "Select job order"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {[...new Set(
+                          customerAdminEntry
+                            .filter((entry: any) => 
+                              entry.internalJobOrder // Ensure internalJobOrder exists
+                            )
+                            .map((entry: any) => entry.internalJobOrder)
+                        )].map((jobOrder: string) => (
+                          <SelectItem key={jobOrder} value={jobOrder}>
+                            {jobOrder}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Time Fields in a Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Setting Time */}
+                {/* Cycle Time */}
                 <FormField
                   control={form.control}
-                  name="settingTime"
+                  name="cycleTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-semibold">Setting Time - "HH:MM:SS"</FormLabel>
+                      <FormLabel className="text-base font-semibold">Cycle Time - "HH:MM:SS"</FormLabel>
                       <FormControl>
                         <Input placeholder="00:00:00" className="h-12" {...field} />
                       </FormControl>
@@ -821,13 +859,13 @@ export default function EmployeeEntryForm() {
                   )}
                 />
 
-                {/* Cycle Time */}
+                {/* Setting Time */}
                 <FormField
                   control={form.control}
-                  name="cycleTime"
+                  name="settingTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-semibold">Cycle Time - "HH:MM:SS"</FormLabel>
+                      <FormLabel className="text-base font-semibold">Setting Time - "HH:MM:SS"</FormLabel>
                       <FormControl>
                         <Input placeholder="00:00:00" className="h-12" {...field} />
                       </FormControl>
@@ -959,7 +997,6 @@ export default function EmployeeEntryForm() {
           <DialogHeader>
             <DialogTitle>Confirm Form Submission</DialogTitle>
           </DialogHeader>
-          
           <div className="space-y-3">
             <div><strong>Date:</strong> {formValues.date}</div>
             <div><strong>Operator Name:</strong> {formValues.operatorName}</div>
@@ -967,6 +1004,7 @@ export default function EmployeeEntryForm() {
             <div><strong>Machine:</strong> {formValues.machine}</div>
             <div><strong>Customer Name:</strong> {formValues.customerName}</div>
             <div><strong>Component Name:</strong> {formValues.componentName}</div>
+            <div><strong>Internal Job Order:</strong> {formValues.internalJobOrder}</div>
             <div><strong>Qty:</strong> {formValues.qty}</div>
             {formValues.additionalQty && formValues.additionalQty > 0 && (
               <div><strong>Additional Qty:</strong> {formValues.additionalQty}</div>
@@ -983,7 +1021,6 @@ export default function EmployeeEntryForm() {
             <div><strong>Total Production Hour:</strong> {totalProductionHr}</div>
             <div><strong>Total Working Hour:</strong> {totalWorkingHrs}</div>
           </div>
-
           <div className="flex justify-center gap-4 pt-6">
             <Button
               onClick={() => {

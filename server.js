@@ -225,7 +225,8 @@ app.post('/api/employeeForm', async(req, res) => {
 		idleTime,
 		startTime,
 		endTime,
-		remarks
+		remarks,
+		internalJobOrder
 	} = req.body;
 	let finalDate = date;
 	// if(String(date).includes('T') && moment(date).format('MM-DD-YYYY')) {
@@ -258,8 +259,9 @@ app.post('/api/employeeForm', async(req, res) => {
 			idleTime,
 			startTime,
 			endTime,
-			remarks 
-		})
+			remarks,
+			internalJobOrder, // Ensure this field is included
+		});
 		console.log('employeeForm saved successfully: ', response);
 		// const qtyUpdate = await adminEntryForm.findOneAndUpdate(
 		// 	{ customerName: customerName, componentName: componentName },

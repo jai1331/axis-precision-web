@@ -135,14 +135,15 @@ export default function Dashboard() {
             rawMaterialPricePerKg: 0,
             materialGrade: 'Unknown',
             rawMaterialCost: 0,
-            internalJobOrder: '',
+            internalJobOrder: item?.internalJobOrder,
           }));
           
           // Merge with admin entry data
           finalData = finalData.map((item: any) => {
             const adminEntry = customerData.find((admin: any) => 
               admin.customerName === item.customerName && 
-              admin.componentName === item.componentName
+              admin.componentName === item.componentName &&
+              (admin.internalJobOrder === item.internalJobOrder || !item.internalJobOrder)
             );
             
             if (adminEntry) {
