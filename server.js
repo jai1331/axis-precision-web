@@ -277,67 +277,56 @@ app.post('/api/employeeForm', async(req, res) => {
 	}
 });
 
-app.get('/api/getEmployeeData', async(req, res) => {
-	console.log('get call', req.query);
-	const { startDate, endDate } = req.query;
-	console.log('req.query', req.query)
-	
-	try {
-		let response;
-		let queryStr = {};
-		
-		// Handle empty startDate - if startDate is empty, get all data up to endDate
-		if (!startDate || startDate === '') {
-			if (endDate) {
-				let endDateFormatted = `${endDate.split('-')[1]}-${endDate.split('-')[0]}-${endDate.split('-')[2]}`;
-				queryStr = {
-					"date": {
-						"$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-					}
-				};
-			} else {
-				// No date filters - get all data
-				queryStr = {};
-			}
-		} else {
-			// Both startDate and endDate are provided
-			let endDateFormatted = `${endDate.split('-')[1]}-${endDate.split('-')[0]}-${endDate.split('-')[2]}`;
-			let startDateFormatted = `${startDate.split('-')[1]}-${startDate.split('-')[0]}-${startDate.split('-')[2]}`;
-			
-			if (String(startDate) === String(endDate)) {
-				queryStr = {
-					"date": {
-						"$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-					}
-				};
-			} else {
-				queryStr = {
-					"date": {
-						"$gte": new Date(startDateFormatted).toISOString(),
-						"$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-					}
-				};
-			}
-		}
-		
-		console.log('queryStr', queryStr);
-		response = await employeeForm.find(queryStr, function(err, result) {
-			if (err) {
-			  console.log('err', err);
-			  return err;
-			} else {
-			  return result;
-			}
-		}).sort({ date: -1 });
-		
-		if(response) {
-			console.log('response', response, response.length);
-			return res.json(response);
-		}
-	  } catch (err) {
-		console.error('Error in getEmployeeData:', err);
-		res.status(500).json({ message: err.message });
-	  }
+app.get('/api/getEmployeeData', async (req, res) => {
+  console.log('get call', req.query);
+  const { startDate, endDate } = req.query;
+
+  try {
+    let queryStr = {};
+
+    // Handle empty startDate - if startDate is empty, get all data up to endDate
+    if (!startDate || startDate === '') {
+      if (endDate) {
+        const endDateFormatted = `${endDate.split('-')[1]}-${endDate.split('-')[0]}-${endDate.split('-')[2]}`;
+        queryStr = {
+          date: {
+            $lt: moment(endDateFormatted).endOf('day').toDate().toISOString(),
+          },
+        };
+      }
+    } else {
+      // Both startDate and endDate are provided
+      const startDateFormatted = `${startDate.split('-')[1]}-${startDate.split('-')[0]}-${startDate.split('-')[2]}`;
+      const endDateFormatted = `${endDate.split('-')[1]}-${endDate.split('-')[0]}-${endDate.split('-')[2]}`;
+
+      if (String(startDate) === String(endDate)) {
+        queryStr = {
+          date: {
+            $lt: moment(endDateFormatted).endOf('day').toDate().toISOString(),
+          },
+        };
+      } else {
+        queryStr = {
+          date: {
+            $gte: new Date(startDateFormatted).toISOString(),
+            $lt: moment(endDateFormatted).endOf('day').toDate().toISOString(),
+          },
+        };
+      }
+    }
+
+    console.log('queryStr', queryStr);
+
+    const response = await employeeForm.find(queryStr).sort({ date: -1 });
+
+    if (response) {
+      console.log('response', response, response.length);
+      return res.json(response);
+    }
+  } catch (err) {
+    console.error('Error in getEmployeeData:', err);
+    res.status(500).json({ message: err.message });
+  }
 });
 
 app.get('/api/getCustomerList', async(req, res) => {
