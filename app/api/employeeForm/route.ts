@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Use local Express server in dev so you can test schema fixes without redeploying Render
+const BACKEND_BASE =
+  process.env.USE_LOCAL_API === 'true' || process.env.NODE_ENV === 'development'
+    ? 'http://localhost:9000'
+    : 'https://axis-precision-app.onrender.com';
+
 export async function OPTIONS() {
   return new Response(null, {
     status: 204,
@@ -13,7 +19,7 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    const apiUrl = 'https://axis-precision-app.onrender.com/api/employeeForm';
+    const apiUrl = `${BACKEND_BASE}/api/employeeForm`;
     
     console.log('Proxying employeeForm GET request to:', apiUrl);
     
@@ -46,7 +52,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const apiUrl = 'https://axis-precision-app.onrender.com/api/employeeForm';
+    const apiUrl = `${BACKEND_BASE}/api/employeeForm`;
     
     console.log('Proxying employeeForm POST request to:', apiUrl);
     
@@ -85,7 +91,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const apiUrl = 'https://axis-precision-app.onrender.com/api/updateEmployeeForm';
+    const apiUrl = `${BACKEND_BASE}/api/updateEmployeeForm`;
     
     console.log('Proxying employeeForm PUT request to:', apiUrl);
     

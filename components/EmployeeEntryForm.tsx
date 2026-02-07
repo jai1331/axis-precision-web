@@ -305,11 +305,25 @@ export default function EmployeeEntryForm() {
   };
 
   const getWorkingHrDiff = (date: string, startTime: string, endTime: string): string => {
-    // Simplified calculation - in real app this would be more complex
-    const [startHour] = startTime.split(':').map(Number);
-    const [endHour] = endTime.split(':').map(Number);
-    const diff = endHour - startHour;
-    return `${diff.toString().padStart(2, '0')}:00`;
+    // Parse 12h format "HH:MM:AM" or "HH:MM:PM" to minutes since midnight
+    const toMinutes = (ampmTime: string): number => {
+      const parts = ampmTime.split(':');
+      let hour = parseInt(parts[0], 10) || 0;
+      const minute = parseInt(parts[1], 10) || 0;
+      const period = (parts[2] || '').toUpperCase();
+      if (period === 'PM' && hour !== 12) hour += 12;
+      if (period === 'AM' && hour === 12) hour = 0;
+      return hour * 60 + minute;
+    };
+
+    let startMins = toMinutes(startTime);
+    let endMins = toMinutes(endTime);
+    if (endMins <= startMins) endMins += 24 * 60; // end is next day (e.g. 8 PM → 8 AM)
+
+    const diffMins = endMins - startMins;
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
   const onSubmit = async (values: FormValues) => {
@@ -388,10 +402,12 @@ export default function EmployeeEntryForm() {
       const isoDate = new Date(formValues.date).toISOString();
       console.log('Converted date:', isoDate);
 
-      // Prepare payload
+      // Prepare payload (include calculated fields from modal state)
       const payload = {
         ...formValues,
         date: isoDate,
+        ...(totalProductionHr ? { totalProductionHr } : {}),
+        ...(totalWorkingHrs ? { totalWorkingHrs } : {}),
         ...(showUpdateBtn ? { id: showUpdateBtn } : {}),
       };
       

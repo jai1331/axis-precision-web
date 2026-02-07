@@ -202,11 +202,16 @@ export const getTotalMachineHrs = (machineData: any[], workMode: boolean = false
   }, '00:00:00') }));
   const timeCollectionQtyaMultipliedObj = Object.assign({}, ...timeCollectionQtyMultiplied);
   const timeCollectionQtyWithSettingTimeKey = machineData.map(o => {
-    let startEndTimeDiff = getWorkingHrDiff(o.date, o.startTime.toLowerCase(), o.endTime.toLowerCase());
-    let totalWrkHr = "";
-    if (startEndTimeDiff) {
-      let duration = moment.duration({ hours: o.idleTime.split(':')[0], minutes: o.idleTime.split(':')[1] });
-      totalWrkHr = moment(startEndTimeDiff, 'HH:mm').subtract(duration).format('HH:mm');
+    // Prefer existing totalWorkingHrs from API (e.g. from employee form) so it's not overwritten with 0
+    const existingWorking = (o.totalWorkingHrs || o.totalWorkingHr || '').toString().trim();
+    let totalWrkHr = existingWorking;
+    if (!totalWrkHr || totalWrkHr === '0' || totalWrkHr === '0:00' || totalWrkHr === '00:00:00') {
+      const startEndTimeDiff = getWorkingHrDiff(o.date, o.startTime?.toLowerCase?.() || '', o.endTime?.toLowerCase?.() || '');
+      if (startEndTimeDiff) {
+        const idleParts = (o.idleTime || '00:00:00').split(':');
+        const duration = moment.duration({ hours: parseInt(idleParts[0], 10) || 0, minutes: parseInt(idleParts[1], 10) || 0 });
+        totalWrkHr = moment(startEndTimeDiff, 'HH:mm').subtract(duration).format('HH:mm');
+      }
     }
     return {
       ...o,
@@ -238,7 +243,8 @@ export const getTotalMachineHrs = (machineData: any[], workMode: boolean = false
 
 export const getTotalWorkingHrs = (data: any[]): { totalWorkingHrs: string } => {
   return data.reduce<{ totalWorkingHrs: string }>((acc, obj) => {
-    let addTime = addTimes(acc.totalWorkingHrs, obj.totalWorkingHrs, '00:00:00');
+    const working = obj.totalWorkingHrs || obj.totalWorkingHr || '00:00:00';
+    const addTime = addTimes(acc.totalWorkingHrs, working, '00:00:00');
     return { totalWorkingHrs: addTime };
   }, { totalWorkingHrs: '00:00:00' });
 };

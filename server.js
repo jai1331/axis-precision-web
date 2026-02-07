@@ -14,12 +14,16 @@ const helmet = require("helmet");
 var XLSX = require('xlsx');
 const cors = require('cors');
 
+console.log('Server is starting...');
+
 const app = express();
 
 const allowedOrigins = [
-  'http://localhost:3000',
-  'https://axis-precision-web-1dvc.vercel.app'
+  'http://localhost:3000', // Frontend running locally
+  'http://localhost:9000', // Backend running locally
+  'https://axis-precision-web-1dvc.vercel.app' // Frontend deployed on Vercel
 ];
+
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
@@ -45,6 +49,7 @@ const alterMongoUri = 'mongodb://localhost:27017/login-app-db'; // Changed to st
 
 // Function to connect to MongoDB with fallback
 const connectToMongoDB = async () => {
+	app.set('mongoUsedLocal', false); // default: Atlas
 	const options = {
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
@@ -54,23 +59,26 @@ const connectToMongoDB = async () => {
 		maxPoolSize: 10,
 	};
 
+	let usedFallback = false;
 	try {
 		console.log('Attempting to connect to MongoDB Atlas...');
 		await mongoose.connect(mongoUri, options);
-		console.log('Connected successfully to MongoDB Atlas');
+		console.log('Connected successfully to MongoDB Atlas (cloud). New employee entries will be saved HERE.');
 	} catch (atlasError) {
 		console.error('MongoDB Atlas connection failed:', atlasError.message);
 		console.log('Attempting to connect to local MongoDB...');
-		
+		usedFallback = true;
 		try {
 			await mongoose.connect(alterMongoUri, options);
-			console.log('Connected successfully to local MongoDB');
+			console.log('Connected to LOCAL MongoDB (localhost:27017). New employee entries will be saved HERE — not in Atlas. If you expect to see them in Atlas, fix the Atlas connection.');
 		} catch (localError) {
 			console.error('Local MongoDB connection failed:', localError.message);
 			console.error('Both MongoDB connections failed. Please check your MongoDB setup.');
 			process.exit(1);
 		}
 	}
+	// Expose so routes can log where data was saved
+	app.set('mongoUsedLocal', usedFallback);
 };
 
 // Connect to MongoDB
@@ -228,11 +236,10 @@ app.post('/api/employeeForm', async(req, res) => {
 		remarks,
 		internalJobOrder
 	} = req.body;
+
+	console.log('Request body received:', req.body); // Log the entire payload
+
 	let finalDate = date;
-	// if(String(date).includes('T') && moment(date).format('MM-DD-YYYY')) {
-	// 	finalDate = moment(date).format('MM-DD-YYYY');
-	// } else finalDate = moment(`${date.split('-')[1]}-${date.split('-')[0]}-${date.split('-')[2]}`).format('MM-DD-YYYY')
-	// let startDateFormatted = date;
 	if(String(date).includes('T')) {
 		finalDate = date;
 	} else {
@@ -241,39 +248,26 @@ app.post('/api/employeeForm', async(req, res) => {
 	}
 
 	console.log('date', date, 'moment', finalDate);
+	
 	try {
-		const response = await employeeForm.create({
-			operatorName,
-			date: finalDate,
-			shift,
-			machine,
-			customerName,
-			componentName,
-			qty,
-			additionalQty,
-			opn,
-			progNo,
-			settingTime,
-			cycleTime,
-			handlingTime,
-			idleTime,
-			startTime,
-			endTime,
-			remarks,
-			internalJobOrder, // Ensure this field is included
-		});
-		console.log('employeeForm saved successfully: ', response);
-		// const qtyUpdate = await adminEntryForm.findOneAndUpdate(
-		// 	{ customerName: customerName, componentName: componentName },
-		// 	{ $inc: { qty: -qty } },
-		// 	{new: true}
-		// );
-		// console.log(qtyUpdate);&& qtyUpdate && Object.keys(qtyUpdate).length)
-		if(response) { 
-			return res.json({ status: 'ok', response: response });
+		// Don't pass `id` to create — it's only for updates. Omitting it ensures a new document is inserted.
+		const { id, ...bodyForCreate } = req.body;
+		const payload = { ...bodyForCreate, date: finalDate };
+
+		const response = await employeeForm.create(payload);
+		const doc = response.toObject();
+
+		console.log('employeeForm saved successfully:', response._id);
+		console.log('Saved document keys:', Object.keys(doc));
+		const dbLabel = app.get('mongoUsedLocal') ? 'LOCAL (localhost:27017)' : 'Atlas (cloud)';
+		console.log('Saved to MongoDB:', dbLabel, '| database: login-app-db | collection: employeeForm');
+
+		if (response) {
+			return res.json({ status: 'ok', response: response, _savedTo: dbLabel });
 		}
-	} catch(err) {
-		return res.json({ status: 'error', error: 'Unable to save' })
+	} catch (err) {
+		console.error('employeeForm create error:', err);
+		return res.json({ status: 'error', error: 'Unable to save' });
 	}
 });
 
@@ -557,6 +551,7 @@ app.get('/api/downloadExcel', async(req, res) => {
 	// }
 });
 
-
-app.listen(PORT, () => console.log(`Listening on ${ PORT }`))
+console.log('About to start the server...');
+app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+console.log('Server started successfully.');
 

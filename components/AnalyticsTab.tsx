@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,8 +52,13 @@ interface AnalyticsTabProps {
 }
 
 const timeStringToHours = (time: string): number => {
-  if (!time) return 0; // Handle empty or invalid time strings
-  const [hours, minutes, seconds] = time.split(':').map(Number);
+  if (time == null || time === '') return 0;
+  const str = String(time).trim();
+  if (!str) return 0;
+  const parts = str.split(':').map((x) => parseInt(x, 10) || 0);
+  const hours = parts[0] ?? 0;
+  const minutes = parts[1] ?? 0;
+  const seconds = parts[2] ?? 0;
   return hours + minutes / 60 + seconds / 3600;
 };
 
@@ -75,6 +80,8 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     materialGrades: [] as string[],
     opns: [] as string[], // Add opns here
   });
+  const [tcPricePerHr, setTcPricePerHr] = useState<string>('250');
+  const [vmcPricePerHr, setVmcPricePerHr] = useState<string>('450');
   const { toast } = useToast();
 
   const itemsPerPage = 12;
@@ -376,6 +383,34 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     });
   };
 
+  const tcPrice = parseFloat(tcPricePerHr) || 250;
+  const vmcPrice = parseFloat(vmcPricePerHr) || 450;
+
+  const machineCostSummary = useMemo(() => {
+    const data = filteredRecords;
+    if (!data.length) {
+      return { tc1: 0, tc2: 0, tc3: 0, vmc: 0, total: 0, tc1Qty: 0, tc2Qty: 0, tc3Qty: 0, vmcQty: 0, tc1Hrs: 0, tc2Hrs: 0, tc3Hrs: 0, vmcHrs: 0 };
+    }
+    const tc1R = data.filter((r) => r.machineName === 'TC-1');
+    const tc2R = data.filter((r) => r.machineName === 'TC-2');
+    const tc3R = data.filter((r) => r.machineName === 'TC-3');
+    const vmcR = data.filter((r) => r.machineName === 'VMC');
+    const tc1Hrs = tc1R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
+    const tc2Hrs = tc2R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
+    const tc3Hrs = tc3R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
+    const vmcHrs = vmcR.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
+    const tc1Qty = tc1R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+    const tc2Qty = tc2R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+    const tc3Qty = tc3R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+    const vmcQty = vmcR.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+    const tc1Cost = tc1Qty > 0 ? (tc1Hrs * tcPrice) / tc1Qty : 0;
+    const tc2Cost = tc2Qty > 0 ? (tc2Hrs * tcPrice) / tc2Qty : 0;
+    const tc3Cost = tc3Qty > 0 ? (tc3Hrs * tcPrice) / tc3Qty : 0;
+    const vmcCost = vmcQty > 0 ? (vmcHrs * vmcPrice) / vmcQty : 0;
+    const total = tc1Cost + tc2Cost + tc3Cost + vmcCost;
+    return { tc1: tc1Cost, tc2: tc2Cost, tc3: tc3Cost, vmc: vmcCost, total, tc1Qty, tc2Qty, tc3Qty, vmcQty, tc1Hrs, tc2Hrs, tc3Hrs, vmcHrs };
+  }, [filteredRecords, tcPrice, vmcPrice]);
+
   const handleTempFilterChange = (key: keyof ProductionFilters, value: string) => {
     setTempFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -639,6 +674,68 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         </Card>
       </div>
 
+      {/* Machine cost from TC / VMC price per hr (applied when filters are used) */}
+      {filteredRecords.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            {!tcPricePerHr.trim() && !vmcPricePerHr.trim()
+              ? 'Calculation uses default TC price ₹250/hr and VMC price ₹450/hr. Enter values in the filter section to override.'
+              : !tcPricePerHr.trim()
+                ? 'Calculation uses default TC price ₹250/hr. Enter TC machine price per hr in filters to override.'
+                : !vmcPricePerHr.trim()
+                  ? 'Calculation uses default VMC price ₹450/hr. Enter VMC price per hr in filters to override.'
+                  : 'Calculation uses the rates you entered above.'}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">TC-1 production cost</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.tc1.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc1Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc1Qty} qty)</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">TC-2 production cost</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.tc2.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc2Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc2Qty} qty)</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">TC-3 production cost</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.tc3.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc3Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc3Qty} qty)</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">VMC production cost</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.vmc.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.vmcHrs * vmcPrice).toFixed(0)} ÷ {machineCostSummary.vmcQty} qty)</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Total production cost (rawMaterialCost)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.total.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">sum of all machine costs per piece</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
       {/* Job Order Summary Cards */}
       {(hasActiveFilters || filters.internalJobOrder !== 'all') && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -666,18 +763,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Material Cost</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                ₹{filteredRecords.reduce((sum, record) => sum + record.rawMaterialCost, 0).toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">Total cost</p>
-            </CardContent>
-          </Card>
+          
         </div>
       )}
 
@@ -795,6 +881,34 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               </SelectContent>
             </Select>
           </div>
+
+          <div className="row grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+              {/* TC machine price per hr - applies to TC-1, TC-2, TC-3 */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-muted-foreground">TC machine price per hr (₹)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="250"
+                  value={tcPricePerHr}
+                  onChange={(e) => setTcPricePerHr(e.target.value || '')}
+                />
+              </div>
+
+              {/* VMC price per hr */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-muted-foreground">VMC price per hr (₹)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="450"
+                  value={vmcPricePerHr}
+                  onChange={(e) => setVmcPricePerHr(e.target.value || '')}
+                />
+              </div>
+            </div>
 
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-2">

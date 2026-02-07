@@ -412,7 +412,7 @@ export default function Dashboard() {
         'Start Time': typeof item.startTime === 'string' ? item.startTime : new Date(item.startTime).toLocaleString('en-IN'),
         'End Time': typeof item.endTime === 'string' ? item.endTime : new Date(item.endTime).toLocaleString('en-IN'),
         'Production Hours': item.totalProductionHr,
-        'Working Hours': item.totalWorkingHr,
+        'Working Hours': item.totalWorkingHrs || item.totalWorkingHr,
         'Supplier Name': item.supplierName || '',
         'Material Grade': item.materialGrade || '',
         'Raw Material Price Per Kg': item.rawMaterialPricePerKg || 0,
@@ -551,7 +551,7 @@ export default function Dashboard() {
       );
       machineData[machine].workingHrs = addTimes(
         machineData[machine].workingHrs,
-        item.totalWorkingHr || '00:00:00'
+        item.totalWorkingHrs || item.totalWorkingHr || '00:00:00'
       );
       machineData[machine].idleHrs = addTimes(
         machineData[machine].idleHrs,
@@ -840,7 +840,7 @@ export default function Dashboard() {
                       {formatTimeForDisplay(
                         (filteredData.length > 0 ? filteredData : productionData).reduce(
                           (acc: string, item: any) =>
-                            addTimes(acc, item.totalWorkingHr || '00:00:00'),
+                            addTimes(acc, item.totalWorkingHrs || item.totalWorkingHr || '00:00:00'),
                           '00:00:00'
                         )
                       )}
@@ -867,7 +867,7 @@ export default function Dashboard() {
                         const dataToUse = filteredData.length > 0 ? filteredData : productionData;
                         const totalWorkingHrs = dataToUse.reduce(
                           (acc: string, item: any) =>
-                            addTimes(acc, item.totalWorkingHr || '00:00:00'),
+                            addTimes(acc, item.totalWorkingHrs || item.totalWorkingHr || '00:00:00'),
                           '00:00:00'
                         );
                         const totalProductionHrs = dataToUse.reduce(

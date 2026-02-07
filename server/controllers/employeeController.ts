@@ -25,7 +25,9 @@ export const createEmployeeEntry = async (req: Request, res: Response) => {
       startTime,
       endTime,
       remarks,
-      internalJobOrder, // Add this field
+      internalJobOrder,
+      totalProductionHr,
+      totalWorkingHrs,
     } = req.body;
 
     let finalDate = date;
@@ -47,6 +49,7 @@ export const createEmployeeEntry = async (req: Request, res: Response) => {
       additionalQty,
       opn,
       progNo,
+      internalJobOrder,
       settingTime,
       cycleTime,
       handlingTime,
@@ -54,7 +57,8 @@ export const createEmployeeEntry = async (req: Request, res: Response) => {
       startTime,
       endTime,
       remarks,
-      internalJobOrder, // Save this field
+      totalProductionHr,
+      totalWorkingHrs,
     });
 
     if (response) {
