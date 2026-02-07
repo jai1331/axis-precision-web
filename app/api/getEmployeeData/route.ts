@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    // const { searchParams } = new URL(request.url);
+    const { searchParams } = request.nextUrl;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
-    
+
     const apiUrl = `https://axis-precision-app.onrender.com/api/getEmployeeData?startDate=${startDate}&endDate=${endDate}`;
-    
+
     console.log('Proxying getEmployeeData request to:', apiUrl);
-    
+
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
+      cache: 'no-store', // 👈 important for server freshness
     });
 
     if (!response.ok) {
@@ -27,7 +31,6 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    console.log('Successfully fetched employee data, count:', data.length);
     return NextResponse.json(data);
   } catch (error) {
     console.error('Proxy error:', error);
@@ -36,4 +39,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
