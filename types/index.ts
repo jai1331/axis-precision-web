@@ -109,7 +109,6 @@ export interface ProductionFilters {
 }
 
 export interface EmployeeForm {
-  _id?: string;
   operatorName: string;
   date: Date;
   shift: string;
