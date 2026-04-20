@@ -100,7 +100,7 @@ export default function Dashboard() {
         
         // Fetch data from 2016 to 2025 to include all available data
         const startDate = '01-01-2016'; // Start from 2016 to get all historical data
-        const endDate = new Date().toLocaleDateString('en-GB');
+        const endDate = formatDate(new Date());
         
         const employeeData = await getEmployeeData(startDate, endDate);
         const customerData = await getCustomerList();

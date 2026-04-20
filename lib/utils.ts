@@ -80,7 +80,11 @@ export const saveAdminEntryForm = async (values: any, FETCH_TYPE: string = 'save
 // Get employee data
 export const getEmployeeData = async (startDate: string, endDate: string) => {
   try {
-    const response = await fetch(`/api/getEmployeeData?startDate=${startDate}&endDate=${endDate}`);
+    const params = new URLSearchParams({
+      startDate,
+      endDate,
+    });
+    const response = await fetch(`/api/getEmployeeData?${params.toString()}`);
     const body = await response.json();
     if (response.status !== 200) throw Error(body.message);
     return body;
