@@ -12,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Pagination,
@@ -100,7 +102,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     rawMaterialPricePerKgMax: '',
     rawMaterialCostMin: '',
     rawMaterialCostMax: '',
-    opn: 'all', // Add opn filter
+    opn: ['all'],
   });
 
   const [savedFilters, setSavedFilters] = useState<ProductionFilters>({
@@ -117,7 +119,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     rawMaterialPricePerKgMax: '',
     rawMaterialCostMin: '',
     rawMaterialCostMax: '',
-    opn: 'all', // Add opn filter
+    opn: ['all'],
   });
 
   const [tempFilters, setTempFilters] = useState<ProductionFilters>({
@@ -134,7 +136,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     rawMaterialPricePerKgMax: '',
     rawMaterialCostMin: '',
     rawMaterialCostMax: '',
-    opn: 'all', // Add opn filter
+    opn: ['all'],
   });
 
   // Add this state to track filter application
@@ -298,11 +300,11 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       );
     }
   
-    // Apply opn filter
-    if (filters.opn && filters.opn !== 'all') {
-      filtered = filtered.filter(
-        (record) => record.opn === filters.opn
-      );
+    // Apply opn filter (multi-select; 'all' means no filter)
+    const selectedOpns = Array.isArray(filters.opn) ? filters.opn : [filters.opn];
+    const isAllOpns = selectedOpns.length === 0 || selectedOpns.includes('all');
+    if (!isAllOpns) {
+      filtered = filtered.filter((record) => selectedOpns.includes(record.opn));
     }
   
     // Update filtered records
@@ -387,10 +389,50 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const vmcPrice = parseFloat(vmcPricePerHr) || 450;
 
   const machineCostSummary = useMemo(() => {
+    const empty = {
+      tc1: 0, tc2: 0, tc3: 0, vmc: 0,
+      tc1Total: 0, tc2Total: 0, tc3Total: 0, vmcTotal: 0,
+      rawMaterialCost: 0,
+      tc1Qty: 0, tc2Qty: 0, tc3Qty: 0, vmcQty: 0,
+      tc1Hrs: 0, tc2Hrs: 0, tc3Hrs: 0, vmcHrs: 0,
+      usedAdminQty: false,
+    };
     const data = filteredRecords;
-    if (!data.length) {
-      return { tc1: 0, tc2: 0, tc3: 0, vmc: 0, total: 0, tc1Qty: 0, tc2Qty: 0, tc3Qty: 0, vmcQty: 0, tc1Hrs: 0, tc2Hrs: 0, tc3Hrs: 0, vmcHrs: 0 };
-    }
+    if (!data.length) return empty;
+
+    // Match admin entry by applied filter supplierName / componentName / opn (from filtered records)
+    const matchedAdmin = adminEntries.find((admin: any) => {
+      const supplierOk =
+        filters.supplierName === 'all' || admin.supplierName === filters.supplierName;
+      if (!supplierOk) return false;
+
+      return data.some((r) => {
+        const componentOk = admin.componentName === r.componentName;
+        const supplierRecordOk =
+          filters.supplierName === 'all'
+            ? admin.supplierName === r.supplierName || r.supplierName === 'Unknown'
+            : admin.supplierName === filters.supplierName;
+        const opnOk = (() => {
+          const selectedOpns = Array.isArray(filters.opn) ? filters.opn : [filters.opn];
+          const isAllOpns = selectedOpns.length === 0 || selectedOpns.includes('all');
+          if (isAllOpns) return !admin.opn || admin.opn === r.opn;
+          const recordOpnOk = selectedOpns.includes(r.opn);
+          const adminOpnOk = !admin.opn || selectedOpns.includes(admin.opn);
+          return recordOpnOk && adminOpnOk;
+        })();
+        return componentOk && supplierRecordOk && opnOk;
+      });
+    });
+
+    const adminQty =
+      matchedAdmin?.qty != null && Number(matchedAdmin.qty) > 0
+        ? Number(matchedAdmin.qty)
+        : null;
+    const rawMaterialCost =
+      matchedAdmin?.rawMaterialCost != null
+        ? Number(matchedAdmin.rawMaterialCost) || 0
+        : (data.find((r) => (r.rawMaterialCost ?? 0) > 0)?.rawMaterialCost ?? 0);
+
     const tc1R = data.filter((r) => r.machineName === 'TC-1');
     const tc2R = data.filter((r) => r.machineName === 'TC-2');
     const tc3R = data.filter((r) => r.machineName === 'TC-3');
@@ -399,20 +441,70 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     const tc2Hrs = tc2R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
     const tc3Hrs = tc3R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
     const vmcHrs = vmcR.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
-    const tc1Qty = tc1R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
-    const tc2Qty = tc2R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
-    const tc3Qty = tc3R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
-    const vmcQty = vmcR.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+
+    const recordTc1Qty = tc1R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+    const recordTc2Qty = tc2R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+    const recordTc3Qty = tc3R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+    const recordVmcQty = vmcR.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+
+    const tc1Qty = adminQty ?? recordTc1Qty;
+    const tc2Qty = adminQty ?? recordTc2Qty;
+    const tc3Qty = adminQty ?? recordTc3Qty;
+    const vmcQty = adminQty ?? recordVmcQty;
+
     const tc1Cost = tc1Qty > 0 ? (tc1Hrs * tcPrice) / tc1Qty : 0;
     const tc2Cost = tc2Qty > 0 ? (tc2Hrs * tcPrice) / tc2Qty : 0;
     const tc3Cost = tc3Qty > 0 ? (tc3Hrs * tcPrice) / tc3Qty : 0;
     const vmcCost = vmcQty > 0 ? (vmcHrs * vmcPrice) / vmcQty : 0;
-    const total = tc1Cost + tc2Cost + tc3Cost + vmcCost;
-    return { tc1: tc1Cost, tc2: tc2Cost, tc3: tc3Cost, vmc: vmcCost, total, tc1Qty, tc2Qty, tc3Qty, vmcQty, tc1Hrs, tc2Hrs, tc3Hrs, vmcHrs };
-  }, [filteredRecords, tcPrice, vmcPrice]);
+
+    return {
+      tc1: tc1Cost,
+      tc2: tc2Cost,
+      tc3: tc3Cost,
+      vmc: vmcCost,
+      tc1Total: tc1Qty > 0 && tc1Hrs > 0 ? tc1Cost + rawMaterialCost : 0,
+      tc2Total: tc2Qty > 0 && tc2Hrs > 0 ? tc2Cost + rawMaterialCost : 0,
+      tc3Total: tc3Qty > 0 && tc3Hrs > 0 ? tc3Cost + rawMaterialCost : 0,
+      vmcTotal: vmcQty > 0 && vmcHrs > 0 ? vmcCost + rawMaterialCost : 0,
+      rawMaterialCost,
+      tc1Qty,
+      tc2Qty,
+      tc3Qty,
+      vmcQty,
+      tc1Hrs,
+      tc2Hrs,
+      tc3Hrs,
+      vmcHrs,
+      usedAdminQty: adminQty != null,
+    };
+  }, [filteredRecords, tcPrice, vmcPrice, adminEntries, filters.supplierName, filters.opn]);
 
   const handleTempFilterChange = (key: keyof ProductionFilters, value: string) => {
     setTempFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleOpnToggle = (value: string) => {
+    setTempFilters((prev) => {
+      const current = Array.isArray(prev.opn) ? [...prev.opn] : [prev.opn];
+      const hasAll = current.includes('all');
+
+      // Selecting All OPNs → treat as all only
+      if (value === 'all') {
+        return { ...prev, opn: hasAll ? [] : ['all'] };
+      }
+
+      // If All is selected and user picks another option, keep as All
+      if (hasAll) {
+        return { ...prev, opn: ['all'] };
+      }
+
+      // Normal multi-select when All is not selected
+      const next = current.includes(value)
+        ? current.filter((o) => o !== value)
+        : [...current, value];
+
+      return { ...prev, opn: next };
+    });
   };
 
   const handleSortToggle = () => {
@@ -456,7 +548,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       rawMaterialPricePerKgMax: '',
       rawMaterialCostMin: '',
       rawMaterialCostMax: '',
-      opn: 'all', // Add opn filter
+      opn: ['all'],
     };
 
     // Reset all filters to default
@@ -577,6 +669,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     (tempFilters.customerName && tempFilters.customerName !== 'all') ||
     (tempFilters.supplierName && tempFilters.supplierName !== 'all') ||
     (tempFilters.materialGrade && tempFilters.materialGrade !== 'all') ||
+    (Array.isArray(tempFilters.opn) && tempFilters.opn.length > 0 && !tempFilters.opn.includes('all')) ||
     tempFilters.rawMaterialPricePerKgMin || tempFilters.rawMaterialPricePerKgMax ||
     tempFilters.rawMaterialCostMin || tempFilters.rawMaterialCostMax;
   const hasUnsavedChanges = JSON.stringify(tempFilters) !== JSON.stringify(savedFilters);
@@ -626,149 +719,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">TC1 Production</CardTitle>
-            <Factory className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatTime(summaryData.tc1)}</div>
-            <p className="text-xs text-muted-foreground">Machine hours</p>
-          </CardContent>
-        </Card>
 
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">TC2 Production</CardTitle>
-            <Factory className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatTime(summaryData.tc2)}</div>
-            <p className="text-xs text-muted-foreground">Machine hours</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">VMC Production</CardTitle>
-            <Factory className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatTime(summaryData.vmc)}</div>
-            <p className="text-xs text-muted-foreground">Machine hours</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">TC3 Production</CardTitle>
-            <Factory className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatTime(summaryData.tc3)}</div>
-            <p className="text-xs text-muted-foreground">Machine hours</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Machine cost from TC / VMC price per hr (applied when filters are used) */}
-      {filteredRecords.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            {!tcPricePerHr.trim() && !vmcPricePerHr.trim()
-              ? 'Calculation uses default TC price ₹250/hr and VMC price ₹450/hr. Enter values in the filter section to override.'
-              : !tcPricePerHr.trim()
-                ? 'Calculation uses default TC price ₹250/hr. Enter TC machine price per hr in filters to override.'
-                : !vmcPricePerHr.trim()
-                  ? 'Calculation uses default VMC price ₹450/hr. Enter VMC price per hr in filters to override.'
-                  : 'Calculation uses the rates you entered above.'}
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">TC-1 production cost</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">₹{machineCostSummary.tc1.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc1Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc1Qty} qty)</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">TC-2 production cost</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">₹{machineCostSummary.tc2.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc2Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc2Qty} qty)</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">TC-3 production cost</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">₹{machineCostSummary.tc3.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc3Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc3Qty} qty)</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">VMC production cost</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">₹{machineCostSummary.vmc.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.vmcHrs * vmcPrice).toFixed(0)} ÷ {machineCostSummary.vmcQty} qty)</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total production cost (rawMaterialCost)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-xl font-bold">₹{machineCostSummary.total.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">sum of all machine costs per piece</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Job Order Summary Cards */}
-      {(hasActiveFilters || filters.internalJobOrder !== 'all') && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Records</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredRecords.length}</div>
-              <p className="text-xs text-muted-foreground">Filtered records</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {filteredRecords.reduce((sum, record) => sum + record.totalQty, 0).toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">Total qty</p>
-            </CardContent>
-          </Card>
-
-          
-        </div>
-      )}
-
-      {/* Filters Section */}
-      <Card>
+       {/* Filters Section */}
+       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
@@ -863,23 +816,58 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               </SelectContent>
             </Select>
 
-            {/* OPN Filter */}
-            <Select
-              value={tempFilters.opn}
-              onValueChange={(value) => handleTempFilterChange('opn', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All OPNs" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All OPNs</SelectItem>
-                {filterOptions.opns.map((opn) => (
-                  <SelectItem key={opn} value={opn}>
-                    {opn}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* OPN Filter - multi select */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between font-normal"
+                  type="button"
+                >
+                  <span className="truncate">
+                    {(() => {
+                      const selected = Array.isArray(tempFilters.opn) ? tempFilters.opn : [tempFilters.opn];
+                      if (selected.length === 0) return 'Select OPNs';
+                      if (selected.includes('all')) return 'All OPNs';
+                      return selected.join(', ');
+                    })()}
+                  </span>
+                  <Filter className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
+                <div className="flex flex-col gap-1 max-h-60 overflow-y-auto">
+                  <label className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer">
+                    <Checkbox
+                      checked={
+                        Array.isArray(tempFilters.opn)
+                          ? tempFilters.opn.includes('all')
+                          : tempFilters.opn === 'all'
+                      }
+                      onCheckedChange={() => handleOpnToggle('all')}
+                    />
+                    All OPNs
+                  </label>
+                  {filterOptions.opns.map((opn) => {
+                    const selected = Array.isArray(tempFilters.opn) ? tempFilters.opn : [tempFilters.opn];
+                    const hasAll = selected.includes('all');
+                    return (
+                      <label
+                        key={opn}
+                        className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={!hasAll && selected.includes(opn)}
+                          disabled={hasAll}
+                          onCheckedChange={() => handleOpnToggle(opn)}
+                        />
+                        {opn}
+                      </label>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="row grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
@@ -953,6 +941,197 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
           </div>
         </CardContent>
       </Card>
+      
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">TC1 Production</CardTitle>
+            <Factory className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatTime(summaryData.tc1)}</div>
+            <p className="text-xs text-muted-foreground">Machine hours</p>
+          </CardContent>
+        </Card>
+
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">TC2 Production</CardTitle>
+            <Factory className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatTime(summaryData.tc2)}</div>
+            <p className="text-xs text-muted-foreground">Machine hours</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">VMC Production</CardTitle>
+            <Factory className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatTime(summaryData.vmc)}</div>
+            <p className="text-xs text-muted-foreground">Machine hours</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">TC3 Production</CardTitle>
+            <Factory className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatTime(summaryData.tc3)}</div>
+            <p className="text-xs text-muted-foreground">Machine hours</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Machine cost from TC / VMC price per hr (applied when filters are used) */}
+      {filteredRecords.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            {!tcPricePerHr.trim() && !vmcPricePerHr.trim()
+              ? 'Calculation uses default TC price ₹250/hr and VMC price ₹450/hr. Enter values in the filter section to override.'
+              : !tcPricePerHr.trim()
+                ? 'Calculation uses default TC price ₹250/hr. Enter TC machine price per hr in filters to override.'
+                : !vmcPricePerHr.trim()
+                  ? 'Calculation uses default VMC price ₹450/hr. Enter VMC price per hr in filters to override.'
+                  : 'Calculation uses the rates you entered above.'}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">TC-1 production cost</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.tc1.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc1Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc1Qty} qty{machineCostSummary.usedAdminQty ? ' from admin' : ''})</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">TC-2 production cost</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.tc2.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc2Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc2Qty} qty{machineCostSummary.usedAdminQty ? ' from admin' : ''})</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">TC-3 production cost</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.tc3.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.tc3Hrs * tcPrice).toFixed(0)} ÷ {machineCostSummary.tc3Qty} qty{machineCostSummary.usedAdminQty ? ' from admin' : ''})</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">VMC production cost</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.vmc.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.vmcHrs * vmcPrice).toFixed(0)} ÷ {machineCostSummary.vmcQty} qty{machineCostSummary.usedAdminQty ? ' from admin' : ''})</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Total production cost (+ rawMaterialCost)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">TC-1</span>
+                  <span className="font-semibold">₹{machineCostSummary.tc1Total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">TC-2</span>
+                  <span className="font-semibold">₹{machineCostSummary.tc2Total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">TC-3</span>
+                  <span className="font-semibold">₹{machineCostSummary.tc3Total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">VMC</span>
+                  <span className="font-semibold">₹{machineCostSummary.vmcTotal.toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground pt-1">
+                  each = machine cost + ₹{machineCostSummary.rawMaterialCost.toFixed(2)} raw material
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Job Order Summary Cards */}
+      {(hasActiveFilters || filters.internalJobOrder !== 'all') && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Records</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{filteredRecords.length}</div>
+              <p className="text-xs text-muted-foreground">Filtered records</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {(() => {
+                const qtyByMachine = (name: string) =>
+                  filteredRecords
+                    .filter((r) => r.machineName === name)
+                    .reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+                const tc1 = qtyByMachine('TC-1');
+                const tc2 = qtyByMachine('TC-2');
+                const tc3 = qtyByMachine('TC-3');
+                const vmc = qtyByMachine('VMC');
+                const total = tc1 + tc2 + tc3 + vmc;
+                return (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">TC-1</span>
+                      <span className="font-semibold">{tc1.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">TC-2</span>
+                      <span className="font-semibold">{tc2.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">TC-3</span>
+                      <span className="font-semibold">{tc3.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">VMC</span>
+                      <span className="font-semibold">{vmc.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm pt-1 border-t">
+                      <span className="text-muted-foreground">Total</span>
+                      <span className="font-semibold">{total.toLocaleString()}</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          
+        </div>
+      )}
+
+     
 
       {/* Production Records */}
       <div className="space-y-4">

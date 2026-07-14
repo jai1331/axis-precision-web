@@ -57,16 +57,13 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// Generate operator list like in React Native (emp001 to emp100)
 const operatorsList = Array.from({ length: 100 }, (_, i) => {
   const num = i + 1;
   const cnt = num < 10 ? '00' : num < 100 ? '0' : '';
   return `Emp${cnt}${num}`;
 });
 
-// Add time formatting helpers (from ProductionRecordModal)
 function toAmPmString(dateStr: string, timeStr: string) {
-  // dateStr: 'YYYY-MM-DD', timeStr: 'HH:MM' (24h)
   if (!dateStr || !timeStr) return '';
   const [hourStr, minuteStr] = timeStr.split(':');
   let hour = parseInt(hourStr, 10);
@@ -82,7 +79,6 @@ function toAmPmString(dateStr: string, timeStr: string) {
 }
 
 function fromAmPmString(dateStr: string, ampmStr: string) {
-  // ampmStr: 'HH:MM:AM' or 'HH:MM:PM', returns 'YYYY-MM-DDTHH:MM'
   if (!dateStr || !ampmStr) return '';
   const [hourStr, minuteStr, period] = ampmStr.split(':');
   let hour = parseInt(hourStr, 10);
@@ -105,7 +101,6 @@ export default function EmployeeEntryForm() {
   const router = useRouter();
   const { toast } = useToast();
 
-  // Add state for time pickers
   const [startTimeInput, setStartTimeInput] = useState('');
   const [endTimeInput, setEndTimeInput] = useState('');
 
@@ -144,7 +139,6 @@ export default function EmployeeEntryForm() {
     fetchCustomer();
   }, []);
 
-  // Reset component name when customer changes
   useEffect(() => {
     if (watchedCustomer) {
       const customerComponents = customerAdminEntry.filter(
@@ -159,21 +153,18 @@ export default function EmployeeEntryForm() {
     }
   }, [watchedCustomer, customerAdminEntry, form]);
 
-  // On form load, set picker values from defaultValues
   useEffect(() => {
     const date = form.getValues('date');
     setStartTimeInput(fromAmPmString(date, form.getValues('startTime')));
     setEndTimeInput(fromAmPmString(date, form.getValues('endTime')));
   }, []);
 
-  // When date changes, update time pickers
   useEffect(() => {
     const date = form.getValues('date');
     setStartTimeInput(fromAmPmString(date, form.getValues('startTime')));
     setEndTimeInput(fromAmPmString(date, form.getValues('endTime')));
   }, [form.watch('date')]);
 
-  // Check if entered quantity exceeds available quantity
   useEffect(() => {
     if (watchedQty > 0 && Object.keys(totalQtySave).length && totalQtySave.qty < watchedQty) {
       toast({
@@ -187,7 +178,6 @@ export default function EmployeeEntryForm() {
   const fetchCustomer = async () => {
     try {
       console.log('Fetching customer data...');
-      // Use proxy in development, production API in production
       const response = await fetch('/api/getCustomerList');
       console.log('Response status:', response.status);
       
@@ -202,24 +192,20 @@ export default function EmployeeEntryForm() {
       
       if (data.length) {
         setCustomerList(data);
-        
-        // Get unique customer names and select first one
+
         const uniqueCustomers = [...new Set(data.map((item: any) => item.customerName))];
         const customerName = uniqueCustomers[0];
         console.log('Selected customer:', customerName);
-        
-        // Get the most recent component for this customer
+
         const customerComponents = data.filter((item: any) => item.customerName === customerName);
         const componentCur = customerComponents.reduce((a: any, b: any) => 
           new Date(a.created || a.createdAt) > new Date(b.created || b.createdAt) ? a : b
         );
         const componentName = componentCur.componentName;
         console.log('Selected component:', componentName);
-        
-        // Set the quantity object
+
         setTotalQty(componentCur);
-        
-        // Update form values
+
         form.setValue('customerName', customerName as string);
         form.setValue('componentName', componentName as string);
         console.log('Form values updated successfully');
@@ -249,13 +235,12 @@ export default function EmployeeEntryForm() {
     setIsCheckingQty(true);
     
     try {
-      // Use proxy in development, production API in production
       const response = await fetch('/api/getCustomerList');
       if (!response.ok) {
         throw new Error('Failed to fetch customer list');
       }
       const data = await response.json();
-      
+
       if (data.length) {
         const qtyObj = data.filter((cus: any) => 
           cus.customerName === customerName && cus.componentName === componentName
@@ -289,7 +274,6 @@ export default function EmployeeEntryForm() {
     }
   };
 
-  // Utility functions (these would come from util file)
   const addTimes = (time1: string, time2: string): string => {
     const [h1, m1, s1] = time1.split(':').map(Number);
     const [h2, m2, s2] = time2.split(':').map(Number);
@@ -305,7 +289,6 @@ export default function EmployeeEntryForm() {
   };
 
   const getWorkingHrDiff = (date: string, startTime: string, endTime: string): string => {
-    // Parse 12h format "HH:MM:AM" or "HH:MM:PM" to minutes since midnight
     const toMinutes = (ampmTime: string): number => {
       const parts = ampmTime.split(':');
       let hour = parseInt(parts[0], 10) || 0;
@@ -318,7 +301,7 @@ export default function EmployeeEntryForm() {
 
     let startMins = toMinutes(startTime);
     let endMins = toMinutes(endTime);
-    if (endMins <= startMins) endMins += 24 * 60; // end is next day (e.g. 8 PM → 8 AM)
+    if (endMins <= startMins) endMins += 24 * 60;
 
     const diffMins = endMins - startMins;
     const hours = Math.floor(diffMins / 60);
@@ -331,8 +314,7 @@ export default function EmployeeEntryForm() {
       console.log('Form values being submitted:', values);
       console.log('Form is valid:', form.formState.isValid);
       console.log('Form errors:', form.formState.errors);
-      
-      // Validate required fields
+
       if (!values.operatorName || !values.date || !values.customerName || !values.componentName || !values.internalJobOrder) {
         toast({
           title: 'Validation Error',
@@ -341,8 +323,7 @@ export default function EmployeeEntryForm() {
         });
         return;
       }
-      
-      // Check quantity validation
+
       if (Object.keys(totalQtySave).length && totalQtySave.qty < parseInt(values.qty.toString())) {
         toast({
           title: 'Error',
@@ -356,8 +337,7 @@ export default function EmployeeEntryForm() {
       setModalVisible(true);
       setFormValues(values);
       console.log('Modal should be visible now, formValues set:', values);
-      
-      // Calculate production hours
+
       const addedCycleHandleTime = addTimes(values.cycleTime, values.handlingTime);
       const totalQty = values.additionalQty && values.additionalQty > 0 ? values.qty + values.additionalQty : values.qty;
       const qtyFilledArray = Array(totalQty).fill(addedCycleHandleTime);
@@ -368,8 +348,7 @@ export default function EmployeeEntryForm() {
       
       const totalProductionHrWithSettingTime = addTimes(totalCycleHandleTimeWithQty, values.settingTime);
       setTotalProductionHr(totalProductionHrWithSettingTime);
-      
-      // Calculate working hours
+
       const startEndTimeDiff = getWorkingHrDiff(values.date, values.startTime, values.endTime);
       const [idleHours, idleMinutes] = values.idleTime.split(':').map(Number);
       const idleTotalMinutes = idleHours * 60 + idleMinutes;
@@ -397,12 +376,10 @@ export default function EmployeeEntryForm() {
     try {
       console.log('Starting save process...');
       console.log('Form values:', formValues);
-      
-      // Convert date to ISO format
+
       const isoDate = new Date(formValues.date).toISOString();
       console.log('Converted date:', isoDate);
 
-      // Prepare payload (include calculated fields from modal state)
       const payload = {
         ...formValues,
         date: isoDate,
@@ -437,21 +414,18 @@ export default function EmployeeEntryForm() {
       if (res && res.status === 'ok') {
         setLoader(false);
         setModalVisible(false);
-        
-        // Show success dialog like in React Native
+
         const shouldEdit = window.confirm(
           'Data saved successfully!!! Click Edit if you need to edit the saved data, Click Ok to create new entry.'
         );
-        
+
         if (!shouldEdit) {
-          // Edit mode
           setShowUpdateBtn(res.response._id);
           toast({
             title: 'Success',
             description: 'Entry saved successfully. You can now edit it.',
           });
         } else {
-          // Create new entry
           setShowUpdateBtn(false);
           form.reset(defaultValues);
           setTotalProductionHr('');
@@ -486,10 +460,9 @@ export default function EmployeeEntryForm() {
 
   const handleCustomerChange = (customerName: string) => {
     form.setValue('customerName', customerName);
-    form.setValue('componentName', ''); // Clear component name
+    form.setValue('componentName', '');
   };
 
-  // Get available quantity display
   const getAvailableQty = () => {
     if (customerAdminEntry.length && watchedComponent) {
       if (totalQtySave && Object.keys(totalQtySave).length) {
@@ -531,7 +504,6 @@ export default function EmployeeEntryForm() {
                 variant: 'destructive',
               });
             })} className="space-y-6">
-              {/* Operator Name */}
               <FormField
                 control={form.control}
                 name="operatorName"
@@ -557,7 +529,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Date */}
               <FormField
                 control={form.control}
                 name="date"
@@ -572,7 +543,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Shift */}
               <FormField
                 control={form.control}
                 name="shift"
@@ -598,7 +568,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Machine */}
               <FormField
                 control={form.control}
                 name="machine"
@@ -623,7 +592,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Customer Name */}
               <FormField
                 control={form.control}
                 name="customerName"
@@ -649,7 +617,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Component Name */}
               <FormField
                 control={form.control}
                 name="componentName"
@@ -660,7 +627,6 @@ export default function EmployeeEntryForm() {
                       onValueChange={(value) => {
                         try {
                           field.onChange(value);
-                          // Update quantity when component changes
                           if (value && watchedCustomer) {
                             const componentEntry = customerAdminEntry.find(
                               (entry: any) => entry.customerName === watchedCustomer && entry.componentName === value
@@ -698,7 +664,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Quantity with Available Qty Display */}
               <FormField
                 control={form.control}
                 name="qty"
@@ -754,7 +719,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Additional Quantity */}
               <FormField
                 control={form.control}
                 name="additionalQty"
@@ -780,7 +744,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* OPN */}
               <FormField
                 control={form.control}
                 name="opn"
@@ -807,7 +770,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Program Number */}
               <FormField
                 control={form.control}
                 name="progNo"
@@ -822,7 +784,6 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Internal Job Order */}
               <FormField
                 control={form.control}
                 name="internalJobOrder"
@@ -842,9 +803,7 @@ export default function EmployeeEntryForm() {
                       <SelectContent>
                         {[...new Set(
                           customerAdminEntry
-                            .filter((entry: any) => 
-                              entry.internalJobOrder // Ensure internalJobOrder exists
-                            )
+                            .filter((entry: any) => entry.internalJobOrder)
                             .map((entry: any) => entry.internalJobOrder)
                         )].map((jobOrder: string) => (
                           <SelectItem key={jobOrder} value={jobOrder}>
@@ -858,9 +817,7 @@ export default function EmployeeEntryForm() {
                 )}
               />
 
-              {/* Time Fields in a Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Cycle Time */}
                 <FormField
                   control={form.control}
                   name="cycleTime"
@@ -875,7 +832,6 @@ export default function EmployeeEntryForm() {
                   )}
                 />
 
-                {/* Setting Time */}
                 <FormField
                   control={form.control}
                   name="settingTime"
@@ -890,7 +846,6 @@ export default function EmployeeEntryForm() {
                   )}
                 />
 
-                {/* Handling Time */}
                 <FormField
                   control={form.control}
                   name="handlingTime"
@@ -905,7 +860,6 @@ export default function EmployeeEntryForm() {
                   )}
                 />
 
-                {/* Idle Time */}
                 <FormField
                   control={form.control}
                   name="idleTime"
@@ -920,7 +874,6 @@ export default function EmployeeEntryForm() {
                   )}
                 />
 
-                {/* Start Time */}
                 <FormField
                   control={form.control}
                   name="startTime"
@@ -943,7 +896,6 @@ export default function EmployeeEntryForm() {
                   )}
                 />
 
-                {/* End Time */}
                 <FormField
                   control={form.control}
                   name="endTime"
@@ -967,7 +919,6 @@ export default function EmployeeEntryForm() {
                 />
               </div>
 
-              {/* Remarks */}
               <FormField
                 control={form.control}
                 name="remarks"
@@ -1007,7 +958,6 @@ export default function EmployeeEntryForm() {
         </CardContent>
       </Card>
 
-      {/* Confirmation Modal */}
       <Dialog open={modalVisible} onOpenChange={setModalVisible}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

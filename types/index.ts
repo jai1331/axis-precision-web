@@ -105,7 +105,7 @@ export interface ProductionFilters {
   rawMaterialPricePerKgMax: string;
   rawMaterialCostMin: string;
   rawMaterialCostMax: string;
-  opn: string; // Add opn property
+  opn: string[]; // Multi-select OPNs; includes 'all' for all OPNs
 }
 
 export interface EmployeeForm {

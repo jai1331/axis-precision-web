@@ -72,12 +72,12 @@ export default function AppHeader() {
                 Add Product
               </Link> */}
               <Link
-                href="/admin/new"
+                href="/admin"
                 className={`transition-colors hover:text-primary ${
-                  pathname === '/admin/new' ? 'text-foreground font-semibold' : 'text-muted-foreground'
+                  pathname.startsWith('/admin') ? 'text-foreground font-semibold' : 'text-muted-foreground'
                 }`}
               >
-                Admin Entry
+                Admin
               </Link>
 
             </>
@@ -124,10 +124,10 @@ export default function AppHeader() {
                     <span className="sr-only">Add New</span>
                   </Button>
                 </Link> */}
-                <Link href="/admin/new">
-                  <Button variant="ghost" size="icon" className={pathname === '/admin/new' ? 'bg-muted' : ''}>
+                <Link href="/admin">
+                  <Button variant="ghost" size="icon" className={pathname.startsWith('/admin') ? 'bg-muted' : ''}>
                     <Settings className="h-5 w-5" />
-                    <span className="sr-only">Admin Entry</span>
+                    <span className="sr-only">Admin</span>
                   </Button>
                 </Link>
 
