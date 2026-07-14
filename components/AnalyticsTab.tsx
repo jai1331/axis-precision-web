@@ -390,11 +390,11 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
   const machineCostSummary = useMemo(() => {
     const empty = {
-      tc1: 0, tc2: 0, tc3: 0, vmc: 0,
-      tc1Total: 0, tc2Total: 0, tc3Total: 0, vmcTotal: 0,
+      tc1: 0, tc2: 0, tc3: 0, vmc: 0, vmc2: 0,
       rawMaterialCost: 0,
-      tc1Qty: 0, tc2Qty: 0, tc3Qty: 0, vmcQty: 0,
-      tc1Hrs: 0, tc2Hrs: 0, tc3Hrs: 0, vmcHrs: 0,
+      totalCost: 0,
+      tc1Qty: 0, tc2Qty: 0, tc3Qty: 0, vmcQty: 0, vmc2Qty: 0,
+      tc1Hrs: 0, tc2Hrs: 0, tc3Hrs: 0, vmcHrs: 0, vmc2Hrs: 0,
       usedAdminQty: false,
     };
     const data = filteredRecords;
@@ -437,47 +437,67 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     const tc2R = data.filter((r) => r.machineName === 'TC-2');
     const tc3R = data.filter((r) => r.machineName === 'TC-3');
     const vmcR = data.filter((r) => r.machineName === 'VMC');
+    const vmc2R = data.filter((r) => r.machineName === 'VMC-2');
     const tc1Hrs = tc1R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
     const tc2Hrs = tc2R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
     const tc3Hrs = tc3R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
     const vmcHrs = vmcR.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
+    const vmc2Hrs = vmc2R.reduce((s, r) => s + timeStringToHours(String(r.totalProductionHr)), 0);
 
     const recordTc1Qty = tc1R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
     const recordTc2Qty = tc2R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
     const recordTc3Qty = tc3R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
     const recordVmcQty = vmcR.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
+    const recordVmc2Qty = vmc2R.reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
 
     const tc1Qty = adminQty ?? recordTc1Qty;
     const tc2Qty = adminQty ?? recordTc2Qty;
     const tc3Qty = adminQty ?? recordTc3Qty;
     const vmcQty = adminQty ?? recordVmcQty;
+    const vmc2Qty = adminQty ?? recordVmc2Qty;
 
     const tc1Cost = tc1Qty > 0 ? (tc1Hrs * tcPrice) / tc1Qty : 0;
     const tc2Cost = tc2Qty > 0 ? (tc2Hrs * tcPrice) / tc2Qty : 0;
     const tc3Cost = tc3Qty > 0 ? (tc3Hrs * tcPrice) / tc3Qty : 0;
     const vmcCost = vmcQty > 0 ? (vmcHrs * vmcPrice) / vmcQty : 0;
+    const vmc2Cost = vmc2Qty > 0 ? (vmc2Hrs * vmcPrice) / vmc2Qty : 0;
+    const totalCost = tc1Cost + tc2Cost + tc3Cost + vmcCost + vmc2Cost + rawMaterialCost;
 
     return {
       tc1: tc1Cost,
       tc2: tc2Cost,
       tc3: tc3Cost,
       vmc: vmcCost,
-      tc1Total: tc1Qty > 0 && tc1Hrs > 0 ? tc1Cost + rawMaterialCost : 0,
-      tc2Total: tc2Qty > 0 && tc2Hrs > 0 ? tc2Cost + rawMaterialCost : 0,
-      tc3Total: tc3Qty > 0 && tc3Hrs > 0 ? tc3Cost + rawMaterialCost : 0,
-      vmcTotal: vmcQty > 0 && vmcHrs > 0 ? vmcCost + rawMaterialCost : 0,
+      vmc2: vmc2Cost,
       rawMaterialCost,
+      totalCost,
       tc1Qty,
       tc2Qty,
       tc3Qty,
       vmcQty,
+      vmc2Qty,
       tc1Hrs,
       tc2Hrs,
       tc3Hrs,
       vmcHrs,
+      vmc2Hrs,
       usedAdminQty: adminQty != null,
     };
   }, [filteredRecords, tcPrice, vmcPrice, adminEntries, filters.supplierName, filters.opn]);
+
+  const hasAppliedFilters =
+    !!filters.search ||
+    !!filters.startDate ||
+    !!filters.endDate ||
+    (filters.internalJobOrder && filters.internalJobOrder !== 'all') ||
+    (filters.customerName && filters.customerName !== 'all') ||
+    (filters.supplierName && filters.supplierName !== 'all') ||
+    (filters.materialGrade && filters.materialGrade !== 'all') ||
+    (Array.isArray(filters.opn) && filters.opn.length > 0 && !filters.opn.includes('all')) ||
+    !!filters.rawMaterialPricePerKgMin ||
+    !!filters.rawMaterialPricePerKgMax ||
+    !!filters.rawMaterialCostMin ||
+    !!filters.rawMaterialCostMax;
 
   const handleTempFilterChange = (key: keyof ProductionFilters, value: string) => {
     setTempFilters((prev) => ({ ...prev, [key]: value }));
@@ -941,7 +961,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -1002,7 +1022,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                   ? 'Calculation uses default VMC price ₹450/hr. Enter VMC price per hr in filters to override.'
                   : 'Calculation uses the rates you entered above.'}
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">TC-1 production cost</CardTitle>
@@ -1041,30 +1061,50 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total production cost (+ rawMaterialCost)</CardTitle>
+                <CardTitle className="text-sm font-medium">VMC-2 production cost</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">TC-1</span>
-                  <span className="font-semibold">₹{machineCostSummary.tc1Total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">TC-2</span>
-                  <span className="font-semibold">₹{machineCostSummary.tc2Total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">TC-3</span>
-                  <span className="font-semibold">₹{machineCostSummary.tc3Total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">VMC</span>
-                  <span className="font-semibold">₹{machineCostSummary.vmcTotal.toFixed(2)}</span>
-                </div>
-                <p className="text-xs text-muted-foreground pt-1">
-                  each = machine cost + ₹{machineCostSummary.rawMaterialCost.toFixed(2)} raw material
-                </p>
+              <CardContent>
+                <div className="text-xl font-bold">₹{machineCostSummary.vmc2.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">per piece ({(machineCostSummary.vmc2Hrs * vmcPrice).toFixed(0)} ÷ {machineCostSummary.vmc2Qty} qty{machineCostSummary.usedAdminQty ? ' from admin' : ''})</p>
               </CardContent>
             </Card>
+            {hasAppliedFilters && (
+              <Card className="sm:col-span-2 lg:col-span-3 xl:col-span-5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total cost</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">TC-1</span>
+                    <span className="font-semibold">₹{machineCostSummary.tc1.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">TC-2</span>
+                    <span className="font-semibold">₹{machineCostSummary.tc2.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">TC-3</span>
+                    <span className="font-semibold">₹{machineCostSummary.tc3.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">VMC</span>
+                    <span className="font-semibold">₹{machineCostSummary.vmc.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">VMC-2</span>
+                    <span className="font-semibold">₹{machineCostSummary.vmc2.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Raw material</span>
+                    <span className="font-semibold">₹{machineCostSummary.rawMaterialCost.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-1 border-t font-semibold">
+                    <span>Total cost</span>
+                    <span>₹{machineCostSummary.totalCost.toFixed(2)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       )}
@@ -1098,7 +1138,8 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                 const tc2 = qtyByMachine('TC-2');
                 const tc3 = qtyByMachine('TC-3');
                 const vmc = qtyByMachine('VMC');
-                const total = tc1 + tc2 + tc3 + vmc;
+                const vmc2 = qtyByMachine('VMC-2');
+                const total = tc1 + tc2 + tc3 + vmc + vmc2;
                 return (
                   <>
                     <div className="flex justify-between text-sm">
@@ -1116,6 +1157,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">VMC</span>
                       <span className="font-semibold">{vmc.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">VMC-2</span>
+                      <span className="font-semibold">{vmc2.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm pt-1 border-t">
                       <span className="text-muted-foreground">Total</span>
