@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCustomerList } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -15,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Package } from 'lucide-react';
+import { Search, Package, ArrowUpDown, ArrowUp, ArrowDown, Pencil } from 'lucide-react';
 
 type AdminInventoryEntry = {
   _id?: string;
@@ -32,6 +33,20 @@ type AdminInventoryEntry = {
   createdAt?: string | Date;
 };
 
+type SortKey =
+  | 'customerName'
+  | 'componentName'
+  | 'qty'
+  | 'dcno'
+  | 'internalJobOrder'
+  | 'supplierName'
+  | 'materialGrade'
+  | 'rawMaterialPricePerKg'
+  | 'rawMaterialCost'
+  | 'addedOn';
+
+type SortDir = 'asc' | 'desc';
+
 const formatAddedAt = (entry: AdminInventoryEntry) => {
   const raw = entry.created ?? entry.createdAt;
   if (!raw) return '—';
@@ -46,10 +61,19 @@ const formatAddedAt = (entry: AdminInventoryEntry) => {
   });
 };
 
+const getAddedAtTs = (entry: AdminInventoryEntry) => {
+  const raw = entry.created ?? entry.createdAt;
+  if (!raw) return 0;
+  const ts = new Date(raw).getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+};
+
 export default function AdminInventory() {
   const [entries, setEntries] = useState<AdminInventoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('addedOn');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const router = useRouter();
   const { toast } = useToast();
 
@@ -76,24 +100,99 @@ export default function AdminInventory() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return entries;
-    return entries.filter((entry) =>
-      [
-        entry.customerName,
-        entry.componentName,
-        entry.supplierName,
-        entry.dcno,
-        entry.internalJobOrder,
-        entry.materialGrade,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    );
-  }, [entries, search]);
+    const base = !term
+      ? [...entries]
+      : entries.filter((entry) =>
+          [
+            entry.customerName,
+            entry.componentName,
+            entry.supplierName,
+            entry.dcno,
+            entry.internalJobOrder,
+            entry.materialGrade,
+          ]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(term))
+        );
+
+    const dir = sortDir === 'asc' ? 1 : -1;
+
+    base.sort((a, b) => {
+      let aVal: string | number = '';
+      let bVal: string | number = '';
+
+      switch (sortKey) {
+        case 'qty':
+          aVal = Number(a.qty) || 0;
+          bVal = Number(b.qty) || 0;
+          break;
+        case 'rawMaterialPricePerKg':
+          aVal = Number(a.rawMaterialPricePerKg) || 0;
+          bVal = Number(b.rawMaterialPricePerKg) || 0;
+          break;
+        case 'rawMaterialCost':
+          aVal = Number(a.rawMaterialCost) || 0;
+          bVal = Number(b.rawMaterialCost) || 0;
+          break;
+        case 'addedOn':
+          aVal = getAddedAtTs(a);
+          bVal = getAddedAtTs(b);
+          break;
+        default:
+          aVal = String(a[sortKey] || '').toLowerCase();
+          bVal = String(b[sortKey] || '').toLowerCase();
+      }
+
+      if (aVal < bVal) return -1 * dir;
+      if (aVal > bVal) return 1 * dir;
+      return 0;
+    });
+
+    return base;
+  }, [entries, search, sortKey, sortDir]);
 
   const totalQty = useMemo(
     () => filtered.reduce((sum, entry) => sum + (Number(entry.qty) || 0), 0),
     [filtered]
+  );
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'addedOn' || key === 'qty' || key === 'rawMaterialCost' ? 'desc' : 'asc');
+    }
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortKey !== column) return <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-50" />;
+    return sortDir === 'asc' ? (
+      <ArrowUp className="ml-1 h-3.5 w-3.5" />
+    ) : (
+      <ArrowDown className="ml-1 h-3.5 w-3.5" />
+    );
+  };
+
+  const SortableHead = ({
+    column,
+    children,
+    className,
+  }: {
+    column: SortKey;
+    children: ReactNode;
+    className?: string;
+  }) => (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => handleSort(column)}
+        className="inline-flex items-center font-medium hover:text-foreground"
+      >
+        {children}
+        <SortIcon column={column} />
+      </button>
+    </TableHead>
   );
 
   if (loading) {
@@ -141,26 +240,33 @@ export default function AdminInventory() {
         />
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Component</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
-              <TableHead>DC No</TableHead>
-              <TableHead>Job Order</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead className="text-right">Price/kg</TableHead>
-              <TableHead className="text-right">RM Cost</TableHead>
-              <TableHead>Added on</TableHead>
+              <SortableHead column="customerName">Customer</SortableHead>
+              <SortableHead column="componentName">Component</SortableHead>
+              <SortableHead column="qty" className="text-right">
+                Qty
+              </SortableHead>
+              <SortableHead column="dcno">DC No</SortableHead>
+              <SortableHead column="internalJobOrder">Job Order</SortableHead>
+              <SortableHead column="supplierName">Supplier</SortableHead>
+              <SortableHead column="materialGrade">Grade</SortableHead>
+              <SortableHead column="rawMaterialPricePerKg" className="text-right">
+                Price/kg
+              </SortableHead>
+              <SortableHead column="rawMaterialCost" className="text-right">
+                RM Cost
+              </SortableHead>
+              <SortableHead column="addedOn">Added on</SortableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
                   No admin entries found
                 </TableCell>
               </TableRow>
@@ -168,7 +274,7 @@ export default function AdminInventory() {
               filtered.map((entry, index) => (
                 <TableRow
                   key={entry._id || `${entry.customerName}-${entry.componentName}-${index}`}
-                  className={entry._id ? 'cursor-pointer' : undefined}
+                  className={entry._id ? 'cursor-pointer hover:bg-muted/50' : undefined}
                   onClick={() => {
                     if (entry._id) router.push(`/admin/${entry._id}`);
                   }}
@@ -188,6 +294,22 @@ export default function AdminInventory() {
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {formatAddedAt(entry)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {entry._id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/admin/${entry._id}`);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

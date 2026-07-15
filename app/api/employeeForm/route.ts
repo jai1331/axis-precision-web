@@ -19,7 +19,8 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    const apiUrl = `${BACKEND_BASE}/api/employeeForm`;
+    // Always use production API for listing so All Entries works without local Express
+    const apiUrl = 'https://axis-precision-app.onrender.com/api/employeeForm';
     
     console.log('Proxying employeeForm GET request to:', apiUrl);
     

@@ -588,11 +588,11 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push('/')}
+                  onClick={() => router.push(showUpdateBtn ? '/admin' : '/')}
                   disabled={isSubmitting}
                   className="px-8"
                 >
-                  Cancel
+                  {showUpdateBtn ? 'Back to Inventory' : 'Cancel'}
                 </Button>
                 <Button 
                   type="submit" 

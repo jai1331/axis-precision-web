@@ -33,6 +33,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import EmployeeEntriesList from '@/components/EmployeeEntriesList';
 
 const formSchema = z.object({
   operatorName: z.string().min(2, 'Operator name is required'),
@@ -485,6 +487,17 @@ export default function EmployeeEntryForm() {
   const availableQty = getAvailableQty();
 
   return (
+    <Tabs defaultValue="form" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="form">New Entry</TabsTrigger>
+        <TabsTrigger value="entries">All Entries</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="entries">
+        <EmployeeEntriesList />
+      </TabsContent>
+
+      <TabsContent value="form">
     <div className="max-w-2xl mx-auto">
       <Card>
         <CardHeader>
@@ -1010,5 +1023,7 @@ export default function EmployeeEntryForm() {
         </DialogContent>
       </Dialog>
     </div>
+      </TabsContent>
+    </Tabs>
   );
 }

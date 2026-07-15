@@ -24,6 +24,15 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Search,
   Filter,
@@ -40,6 +49,8 @@ import {
   Save,
   RotateCcw,
   Download,
+  LayoutGrid,
+  LayoutList,
 } from 'lucide-react';
 import { ProductionRecord, ProductionFilters } from '@/types';
 import ProductionRecordModal from './ProductionRecordModal';
@@ -84,9 +95,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   });
   const [tcPricePerHr, setTcPricePerHr] = useState<string>('250');
   const [vmcPricePerHr, setVmcPricePerHr] = useState<string>('450');
+  const [recordsView, setRecordsView] = useState<'cards' | 'table'>('cards');
   const { toast } = useToast();
 
-  const itemsPerPage = 12;
+  const itemsPerPage = recordsView === 'table' ? 25 : 12;
 
   const [filters, setFilters] = useState<ProductionFilters>({
     search: '',
@@ -707,6 +719,12 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const paginatedRecords = filteredRecords.slice(startIndex, startIndex + itemsPerPage);
 
   useEffect(() => {
+    const pages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
+    setTotalPages(pages);
+    setCurrentPage((prev) => Math.min(prev, pages));
+  }, [recordsView, itemsPerPage, filteredRecords.length]);
+
+  useEffect(() => {
     console.log('=== Processing Production Data ===');
     console.log('Production data length:', productionData?.length);
     
@@ -1193,9 +1211,23 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               </p>
             )}
           </div>
+          <Tabs
+            value={recordsView}
+            onValueChange={(value) => setRecordsView(value as 'cards' | 'table')}
+          >
+            <TabsList>
+              <TabsTrigger value="cards" className="gap-2">
+                <LayoutGrid className="h-4 w-4" />
+                Cards
+              </TabsTrigger>
+              <TabsTrigger value="table" className="gap-2">
+                <LayoutList className="h-4 w-4" />
+                Table
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        {/* Production Records Cards */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -1213,6 +1245,99 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                 </CardContent>
               </Card>
             ))}
+          </div>
+        ) : recordsView === 'table' ? (
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date of Entry</TableHead>
+                  <TableHead>Component Name</TableHead>
+                  <TableHead>Customer Name</TableHead>
+                  <TableHead>Internal Job Order</TableHead>
+                  <TableHead>Machine Name</TableHead>
+                  <TableHead>Operator Name</TableHead>
+                  <TableHead>Shift</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead className="text-right">Additional Qty</TableHead>
+                  <TableHead className="text-right">Total Qty</TableHead>
+                  <TableHead>OPN</TableHead>
+                  <TableHead>Program No</TableHead>
+                  <TableHead>Setting Time</TableHead>
+                  <TableHead>Cycle Time</TableHead>
+                  <TableHead>Handling Time</TableHead>
+                  <TableHead>Idle Time</TableHead>
+                  <TableHead>Start Time</TableHead>
+                  <TableHead>End Time</TableHead>
+                  <TableHead>Total Production Hr</TableHead>
+                  <TableHead>Total Working Hr</TableHead>
+                  <TableHead>Supplier Name</TableHead>
+                  <TableHead>Material Grade</TableHead>
+                  <TableHead className="text-right">RM Price/kg</TableHead>
+                  <TableHead className="text-right">RM Cost</TableHead>
+                  <TableHead>Remarks</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedRecords.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={25} className="h-24 text-center text-muted-foreground">
+                      No production records found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedRecords.map((record) => (
+                    <TableRow
+                      key={record._id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleRecordClick(record)}
+                    >
+                      <TableCell className="whitespace-nowrap">
+                        {new Date(record.dateOfEntry).toLocaleDateString('en-IN')}
+                      </TableCell>
+                      <TableCell className="font-medium">{record.componentName || '—'}</TableCell>
+                      <TableCell>{record.customerName || '—'}</TableCell>
+                      <TableCell>{record.internalJobOrder || '—'}</TableCell>
+                      <TableCell>{record.machineName || '—'}</TableCell>
+                      <TableCell>{record.operatorName || '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{record.shift || '—'}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{record.qty ?? 0}</TableCell>
+                      <TableCell className="text-right">{record.additionalQty ?? 0}</TableCell>
+                      <TableCell className="text-right font-medium">{record.totalQty ?? 0}</TableCell>
+                      <TableCell>{record.opn || '—'}</TableCell>
+                      <TableCell>{record.progNo || '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{record.settingTime || '00:00:00'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{record.cycleTime || '00:00:00'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{record.handlingTime || '00:00:00'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{record.idleTime || '00:00:00'}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {typeof record.startTime === 'string'
+                          ? record.startTime
+                          : new Date(record.startTime).toLocaleString('en-IN')}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {typeof record.endTime === 'string'
+                          ? record.endTime
+                          : new Date(record.endTime).toLocaleString('en-IN')}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{record.totalProductionHr || '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap">{record.totalWorkingHr || '—'}</TableCell>
+                      <TableCell>{record.supplierName || '—'}</TableCell>
+                      <TableCell>{record.materialGrade || '—'}</TableCell>
+                      <TableCell className="text-right">
+                        ₹{Number(record.rawMaterialPricePerKg || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        ₹{Number(record.rawMaterialCost || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="max-w-[160px] truncate">{record.remarks || '—'}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1248,13 +1373,11 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  {/* Customer Info */}
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">{record.customerName}</span>
                   </div>
 
-                  {/* Machine Info */}
                   <div className="flex items-center gap-2">
                     <Factory className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm">{record.machineName}</span>
@@ -1263,7 +1386,6 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                     </Badge>
                   </div>
 
-                  {/* Quantity */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-muted-foreground" />
@@ -1272,7 +1394,6 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                     <span className="text-sm font-bold">{record.totalQty}</span>
                   </div>
 
-                  {/* Status and Operator */}
                   <div className="pt-3 border-t space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Operator</span>
