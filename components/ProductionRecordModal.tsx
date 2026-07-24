@@ -83,7 +83,7 @@ export default function ProductionRecordModal({
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       componentName: '',
       customerName: '',

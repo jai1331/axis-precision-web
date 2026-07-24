@@ -118,7 +118,7 @@ export default function ProductForm({ initialData }: ProductFormProps = {}) {
   };
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues,
   });
 

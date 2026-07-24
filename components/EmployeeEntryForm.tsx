@@ -292,24 +292,59 @@ export default function EmployeeEntryForm({
       console.log('Customer data received:', data.length, 'items');
       
       if (data.length) {
-        setCustomerList(data);
+        // When editing an existing entry, keep saved customer/component in the option lists
+        let list = data;
+        if (initialData?.customerName || initialData?.componentName) {
+          const hasSavedPair = data.some(
+            (item: any) =>
+              item.customerName === initialData.customerName &&
+              item.componentName === initialData.componentName
+          );
+          if (!hasSavedPair && initialData.customerName && initialData.componentName) {
+            list = [
+              {
+                customerName: initialData.customerName,
+                componentName: initialData.componentName,
+                qty: initialData.qty,
+                internalJobOrder: initialData.internalJobOrder,
+              },
+              ...data,
+            ];
+          }
+        }
+        setCustomerList(list);
 
-        const uniqueCustomers = [...new Set(data.map((item: any) => item.customerName))];
-        const customerName = uniqueCustomers[0];
-        console.log('Selected customer:', customerName);
+        // Only auto-select first customer/component for brand-new entries
+        if (!initialData?._id && !entryId && !adminEdit) {
+          const uniqueCustomers = [...new Set(list.map((item: any) => item.customerName))];
+          const customerName = uniqueCustomers[0];
+          console.log('Selected customer:', customerName);
 
-        const customerComponents = data.filter((item: any) => item.customerName === customerName);
-        const componentCur = customerComponents.reduce((a: any, b: any) => 
-          new Date(a.created || a.createdAt) > new Date(b.created || b.createdAt) ? a : b
-        );
-        const componentName = componentCur.componentName;
-        console.log('Selected component:', componentName);
+          const customerComponents = list.filter((item: any) => item.customerName === customerName);
+          const componentCur = customerComponents.reduce((a: any, b: any) =>
+            new Date(a.created || a.createdAt) > new Date(b.created || b.createdAt) ? a : b
+          );
+          const componentName = componentCur.componentName;
+          console.log('Selected component:', componentName);
 
-        setTotalQty(componentCur);
-
-        form.setValue('customerName', customerName as string);
-        form.setValue('componentName', componentName as string);
-        console.log('Form values updated successfully');
+          setTotalQty(componentCur);
+          form.setValue('customerName', customerName as string);
+          form.setValue('componentName', componentName as string);
+          console.log('Form values updated successfully');
+        } else if (initialData?.customerName && initialData?.componentName) {
+          // Preserve saved values and set qty context for the edited entry
+          const matched = list.find(
+            (item: any) =>
+              item.customerName === initialData.customerName &&
+              item.componentName === initialData.componentName
+          );
+          if (matched) setTotalQty(matched);
+          form.setValue('customerName', initialData.customerName);
+          form.setValue('componentName', initialData.componentName);
+          if (initialData.internalJobOrder) {
+            form.setValue('internalJobOrder', initialData.internalJobOrder);
+          }
+        }
       } else {
         console.log('No customer data available');
       }

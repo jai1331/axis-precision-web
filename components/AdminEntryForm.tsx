@@ -84,7 +84,7 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
   };
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues,
   });
 
