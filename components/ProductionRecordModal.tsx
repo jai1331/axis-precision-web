@@ -31,6 +31,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, X, Edit } from 'lucide-react';
+import {
+  getTodayDateString,
+  getValidationErrorMessages,
+  isFutureDate,
+  scrollToFirstError,
+} from '@/lib/formValidation';
 
 const formSchema = z.object({
   componentName: z.string().min(2, 'Component name must be at least 2 characters'),
@@ -49,7 +55,12 @@ const formSchema = z.object({
   startTime: z.string().min(1, 'Start time is required'),
   endTime: z.string().min(1, 'End time is required'),
   remarks: z.string().optional(),
-  dateOfEntry: z.string().min(1, 'Date of entry is required'),
+  dateOfEntry: z
+    .string()
+    .min(1, 'Date of entry is required')
+    .refine((value) => !isFutureDate(value), {
+      message: 'Future date is not allowed',
+    }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -221,11 +232,11 @@ export default function ProductionRecordModal({
         redirect: 'follow' as RequestRedirect
       };
 
-      console.log('/api/updateEmployeeForm', 'call put', requestOptions);
-      const response = await fetch('/api/updateEmployeeForm', requestOptions);
+      console.log('/api/employeeForm', 'call put', requestOptions);
+      const response = await fetch('/api/employeeForm', requestOptions);
       const body = await response.json();
       
-      if (response.status !== 200) throw Error(body.message);
+      if (!response.ok) throw Error(body.message || body.error || 'Failed to update production record');
       
       toast({
         title: 'Success',
@@ -233,7 +244,7 @@ export default function ProductionRecordModal({
       });
 
       if (onUpdate) {
-        onUpdate(body);
+        onUpdate(body?.response || body);
       }
 
       setIsEditing(false);
@@ -246,6 +257,18 @@ export default function ProductionRecordModal({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const onInvalid = (errors: any) => {
+    const messages = getValidationErrorMessages(errors);
+    toast({
+      title: 'Validation Error',
+      description: messages.length
+        ? messages.join('. ')
+        : 'Please check all required fields and try again.',
+      variant: 'destructive',
+    });
+    scrollToFirstError(errors);
   };
 
   const handleClose = () => {
@@ -279,7 +302,7 @@ export default function ProductionRecordModal({
 
         {isEditing ? (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
@@ -509,7 +532,7 @@ export default function ProductionRecordModal({
                     <FormItem>
                       <FormLabel>Date of Entry</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input type="date" max={getTodayDateString()} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

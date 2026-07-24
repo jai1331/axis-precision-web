@@ -24,7 +24,7 @@ const EmployeeFormSchema: Schema = new Schema(
     machine: {
       type: String,
       required: [true, 'Machine is required'],
-      enum: ['TC-1', 'TC-2', 'TC-3', 'VMC'],
+      trim: true,
     },
     customerName: {
       type: String,

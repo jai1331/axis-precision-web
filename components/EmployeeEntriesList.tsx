@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, ClipboardList } from 'lucide-react';
+import { Search, ClipboardList, Pencil } from 'lucide-react';
 
 type EmployeeEntry = {
   _id?: string;
@@ -52,10 +54,16 @@ const formatDate = (value?: string | Date) => {
   });
 };
 
-export default function EmployeeEntriesList() {
+interface EmployeeEntriesListProps {
+  /** When true, show Edit actions and open admin edit page */
+  editable?: boolean;
+}
+
+export default function EmployeeEntriesList({ editable = false }: EmployeeEntriesListProps) {
   const [entries, setEntries] = useState<EmployeeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -109,6 +117,11 @@ export default function EmployeeEntriesList() {
     );
   }, [entries, search]);
 
+  const openEdit = (id?: string) => {
+    if (!id) return;
+    router.push(`/admin/employee/${id}`);
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -117,6 +130,8 @@ export default function EmployeeEntriesList() {
       </div>
     );
   }
+
+  const colSpan = editable ? 21 : 20;
 
   return (
     <div className="space-y-4">
@@ -167,18 +182,25 @@ export default function EmployeeEntriesList() {
               <TableHead>Prod Hr</TableHead>
               <TableHead>Work Hr</TableHead>
               <TableHead>Remarks</TableHead>
+              {editable && <TableHead className="text-right">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={20} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={colSpan} className="h-24 text-center text-muted-foreground">
                   No employee entries found
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((entry, index) => (
-                <TableRow key={entry._id || `entry-${index}`}>
+                <TableRow
+                  key={entry._id || `entry-${index}`}
+                  className={editable && entry._id ? 'cursor-pointer hover:bg-muted/50' : undefined}
+                  onClick={() => {
+                    if (editable && entry._id) openEdit(entry._id);
+                  }}
+                >
                   <TableCell className="whitespace-nowrap">{formatDate(entry.date)}</TableCell>
                   <TableCell className="font-medium">{entry.operatorName || '—'}</TableCell>
                   <TableCell>{entry.customerName || '—'}</TableCell>
@@ -201,6 +223,24 @@ export default function EmployeeEntriesList() {
                   <TableCell className="whitespace-nowrap">{entry.totalProductionHr || '—'}</TableCell>
                   <TableCell className="whitespace-nowrap">{entry.totalWorkingHrs || '—'}</TableCell>
                   <TableCell className="max-w-[160px] truncate">{entry.remarks || '—'}</TableCell>
+                  {editable && (
+                    <TableCell className="text-right">
+                      {entry._id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(entry._id);
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

@@ -34,6 +34,7 @@ import {
 import { Loader2, Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCustomerList, saveAdminEntryForm, updateAdmitEntryForm } from '@/lib/utils';
+import { getValidationErrorMessages, scrollToFirstError } from '@/lib/formValidation';
 
 const formSchema = z.object({
   customerName: z.string().min(2, 'Customer name must be at least 2 characters'),
@@ -63,6 +64,9 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
   const [filteredCustomers, setFilteredCustomers] = useState<string[]>([]);
   const [filteredComponents, setFilteredComponents] = useState<string[]>([]);
   const [showUpdateBtn, setShowUpdateBtn] = useState(false);
+  const [entryId, setEntryId] = useState<string | undefined>(
+    initialData?._id ? String(initialData._id) : undefined
+  );
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -87,7 +91,20 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
   useEffect(() => {
     fetchCustomer();
     if (initialData?._id) {
+      const id = String(initialData._id);
+      setEntryId(id);
       setShowUpdateBtn(true);
+      form.reset({
+        customerName: initialData.customerName || '',
+        componentName: initialData.componentName || '',
+        qty: initialData.qty || 0,
+        dcno: initialData.dcno || '',
+        internalJobOrder: initialData.internalJobOrder || '',
+        supplierName: initialData.supplierName || '',
+        rawMaterialPricePerKg: initialData.rawMaterialPricePerKg || 0,
+        materialGrade: initialData.materialGrade || '',
+        rawMaterialCost: initialData.rawMaterialCost || 0,
+      });
     }
   }, [initialData]);
 
@@ -173,9 +190,9 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
 
     try {
       let res;
-      if (showUpdateBtn && initialData?._id) {
-        // Update existing entry
-        res = await updateAdmitEntryForm(values, initialData._id, 'admin');
+      if (entryId) {
+        // Update existing entry in adminEntryForm collection
+        res = await updateAdmitEntryForm(values, entryId, 'admin');
       } else {
         // Save new entry
         res = await saveAdminEntryForm(values, 'saveAdminForm');
@@ -184,18 +201,20 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
       if (res && res.status === 'ok') {
         toast({
           title: 'Success',
-          description: showUpdateBtn ? 'Admin entry updated successfully' : 'Admin entry added successfully',
+          description: entryId ? 'Admin entry updated successfully' : 'Admin entry added successfully',
         });
 
-        if (!showUpdateBtn) {
+        if (!entryId) {
           // Show edit option like in React Native version
           const shouldEdit = window.confirm(
             'Data saved successfully! Click OK to create new entry, or Cancel to edit the saved data.'
           );
           
           if (!shouldEdit) {
-            // Edit mode - set the update button with the new entry ID
-            setShowUpdateBtn(res.response._id);
+            // Edit mode - keep the new entry id for subsequent updates
+            const newId = res.response?._id ? String(res.response._id) : undefined;
+            setEntryId(newId);
+            setShowUpdateBtn(!!newId);
             toast({
               title: 'Info',
               description: 'Entry saved. You can now edit it.',
@@ -207,6 +226,8 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
           form.reset(defaultValues);
           setCustomerSearch('');
           setComponentSearch('');
+          setEntryId(undefined);
+          setShowUpdateBtn(false);
           fetchCustomer();
         } else {
           router.push('/admin');
@@ -214,7 +235,7 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
       } else {
         toast({
           title: 'Error',
-          description: 'Failed to save admin entry',
+          description: (res as any)?.error || (res as any)?.message || 'Failed to save admin entry',
           variant: 'destructive',
         });
       }
@@ -222,12 +243,24 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
       console.error('Error saving admin entry:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save admin entry',
+        description: error instanceof Error ? error.message : 'Failed to save admin entry',
         variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const onInvalid = (errors: any) => {
+    const messages = getValidationErrorMessages(errors);
+    toast({
+      title: 'Validation Error',
+      description: messages.length
+        ? messages.join('. ')
+        : 'Please check all required fields and try again.',
+      variant: 'destructive',
+    });
+    scrollToFirstError(errors);
   };
 
   const handleCustomerSelect = (customer: string) => {
@@ -284,7 +317,7 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
         </CardHeader>
         <CardContent className="pt-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
               {/* Customer Name */}
               <FormField
                 control={form.control}

@@ -332,11 +332,35 @@ app.put('/api/updateAdmitEntryForm', async (req: Request, res: Response) => {
   console.log('req', req.body);
   
   try {
-    const response = await AdminEntryForm.findOneAndUpdate({ _id: req.body.id }, req.body, { new: true });
-    if (response) {
-      console.log('response', response);
-      return res.json({ status: 'ok', response: response });
+    const entryId = req.body.id || req.body._id;
+    if (!entryId) {
+      return res.status(400).json({ status: 'error', message: 'Entry id is required' });
     }
+
+    const updateData = {
+      customerName: req.body.customerName,
+      componentName: req.body.componentName,
+      qty: req.body.qty,
+      dcno: req.body.dcno,
+      internalJobOrder: req.body.internalJobOrder,
+      supplierName: req.body.supplierName,
+      rawMaterialPricePerKg: req.body.rawMaterialPricePerKg,
+      materialGrade: req.body.materialGrade,
+      rawMaterialCost: req.body.rawMaterialCost,
+    };
+
+    const response = await AdminEntryForm.findOneAndUpdate(
+      { _id: entryId },
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!response) {
+      return res.status(404).json({ status: 'error', message: 'Admin entry not found' });
+    }
+
+    console.log('response', response);
+    return res.json({ status: 'ok', response: response });
   } catch (err: any) {
     res.status(500).json({ message: err.message });
   }
@@ -345,25 +369,35 @@ app.put('/api/updateAdmitEntryForm', async (req: Request, res: Response) => {
 // Update employee form endpoint
 app.put('/api/updateEmployeeForm', async (req: Request, res: Response) => {
   console.log(req.body, 'req');
-  let finalDate = req.body.date;
-  
-  if (String(req.body.date).includes('T')) {
-    finalDate = req.body.date;
-  } else {
-    let startDateFormatted = `${req.body.date.split('-')[1]}-${req.body.date.split('-')[0]}-${req.body.date.split('-')[2]}`;
-    finalDate = new Date(startDateFormatted).toISOString();
-  }
-
-  console.log('date', req.body.date, 'moment', finalDate);
-  req.body.date = finalDate;
-  console.log('date after', req.body.date);
   
   try {
-    const response = await EmployeeForm.findOneAndUpdate({ _id: req.body.id }, req.body, { new: true });
-    if (response) {
-      console.log('response', response);
-      return res.json({ status: 'ok', response: response });
+    const entryId = req.body.id || req.body._id;
+    if (!entryId) {
+      return res.status(400).json({ status: 'error', message: 'Entry id is required' });
     }
+
+    let finalDate = req.body.date;
+    if (req.body.date && !String(req.body.date).includes('T')) {
+      let startDateFormatted = `${req.body.date.split('-')[1]}-${req.body.date.split('-')[0]}-${req.body.date.split('-')[2]}`;
+      finalDate = new Date(startDateFormatted).toISOString();
+    }
+
+    console.log('date', req.body.date, 'moment', finalDate);
+    const { id, _id, ...rest } = req.body;
+    const updateData = { ...rest, date: finalDate };
+  
+    const response = await EmployeeForm.findOneAndUpdate(
+      { _id: entryId },
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!response) {
+      return res.status(404).json({ status: 'error', message: 'Employee entry not found' });
+    }
+
+    console.log('response', response);
+    return res.json({ status: 'ok', response: response });
   } catch (err: any) {
     console.log('err', err);
     res.status(500).json({ message: err.message });

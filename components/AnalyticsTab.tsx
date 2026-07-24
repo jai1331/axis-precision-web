@@ -55,6 +55,7 @@ import {
 import { ProductionRecord, ProductionFilters } from '@/types';
 import ProductionRecordModal from './ProductionRecordModal';
 import { addTimes, getEmployeeData, formatDate, getCustomerList } from '@/lib/utils';
+import { getTodayDateString, isFutureDate } from '@/lib/formValidation';
 import moment from 'moment';
 import * as XLSX from 'xlsx';
 
@@ -343,6 +344,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         tc1: dashboardData.tc1ProdTime || '0:00',
         tc2: dashboardData.tc2ProdTime || '0:00',
         vmc: dashboardData.vmcProdTime || '0:00',
+        vmc2: dashboardData.vmc2ProdTime || '0:00',
         tc3: dashboardData.tc3ProdTime || '0:00',
         totalProductionHr: dashboardData.productionHrs || '0:00',
         totalIdleHr: dashboardData.idleHrs || '0:00',
@@ -356,6 +358,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         tc1: '0:00',
         tc2: '0:00',
         vmc: '0:00',
+        vmc2: '0:00',
         tc3: '0:00',
         totalProductionHr: '0:00',
         totalIdleHr: '0:00',
@@ -368,15 +371,17 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     const tc1Records = data.filter(record => record.machineName === 'TC-1');
     const tc2Records = data.filter(record => record.machineName === 'TC-2');
     const vmcRecords = data.filter(record => record.machineName === 'VMC');
+    const vmc2Records = data.filter(record => record.machineName === 'VMC-2');
     const tc3Records = data.filter(record => record.machineName === 'TC-3');
   
     // Calculate totals for each machine
     const tc1Total = tc1Records.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
     const tc2Total = tc2Records.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
     const vmcTotal = vmcRecords.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
+    const vmc2Total = vmc2Records.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
     const tc3Total = tc3Records.reduce((sum, record) => sum + timeStringToHours(String(record.totalProductionHr)), 0);
   
-    const totalProduction = tc1Total + tc2Total + vmcTotal + tc3Total;
+    const totalProduction = tc1Total + tc2Total + vmcTotal + vmc2Total + tc3Total;
     const totalIdle = data.reduce((sum, record) => sum + timeStringToHours(String(record.idleTime)), 0);
     const totalWorking = data.reduce((sum, record) => sum + timeStringToHours(String(record.totalWorkingHr)), 0);
   
@@ -390,6 +395,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       tc1: formatHours(tc1Total),
       tc2: formatHours(tc2Total),
       vmc: formatHours(vmcTotal),
+      vmc2: formatHours(vmc2Total),
       tc3: formatHours(tc3Total),
       totalProductionHr: formatHours(totalProduction),
       totalIdleHr: formatHours(totalIdle),
@@ -548,6 +554,28 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
   // Update the saveFilters function
   const saveFilters = () => {
+    if (isFutureDate(tempFilters.startDate) || isFutureDate(tempFilters.endDate)) {
+      toast({
+        title: 'Validation Error',
+        description: 'Future date is not allowed in start/end date filters',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      tempFilters.startDate &&
+      tempFilters.endDate &&
+      tempFilters.startDate > tempFilters.endDate
+    ) {
+      toast({
+        title: 'Validation Error',
+        description: 'Start date cannot be after end date',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     console.log('=== Saving Filters ===');
     console.log('Previous filters:', filters);
     console.log('New filters to apply:', tempFilters);
@@ -816,6 +844,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                 type="date"
                 placeholder="Start date"
                 className="pl-10"
+                max={getTodayDateString()}
                 value={tempFilters.startDate}
                 onChange={(e) => handleTempFilterChange('startDate', e.target.value)}
               />
@@ -828,6 +857,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                 type="date"
                 placeholder="End date"
                 className="pl-10"
+                max={getTodayDateString()}
                 value={tempFilters.endDate}
                 onChange={(e) => handleTempFilterChange('endDate', e.target.value)}
               />
@@ -981,7 +1011,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">TC1 Production</CardTitle>
@@ -1012,6 +1042,17 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatTime(summaryData.vmc)}</div>
+            <p className="text-xs text-muted-foreground">Machine hours</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">VMC-2 Production</CardTitle>
+            <Factory className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatTime(summaryData.vmc2)}</div>
             <p className="text-xs text-muted-foreground">Machine hours</p>
           </CardContent>
         </Card>

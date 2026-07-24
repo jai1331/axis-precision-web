@@ -35,12 +35,24 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EmployeeEntriesList from '@/components/EmployeeEntriesList';
+import {
+  getTodayDateString,
+  getValidationErrorMessages,
+  isFutureDate,
+  scrollToFirstError,
+} from '@/lib/formValidation';
+import { DEFAULT_MACHINES, fetchMachines } from '@/lib/machines';
 
 const formSchema = z.object({
   operatorName: z.string().min(2, 'Operator name is required'),
-  date: z.string().min(1, 'Date is required'),
+  date: z
+    .string()
+    .min(1, 'Date is required')
+    .refine((value) => !isFutureDate(value), {
+      message: 'Future date is not allowed',
+    }),
   shift: z.enum(['First', 'Second', 'Third', '12hrMng', '12hrNight']),
-  machine: z.enum(['TC-1', 'TC-2', 'TC-3', 'VMC']),
+  machine: z.string().min(1, 'Machine is required'),
   customerName: z.string().min(2, 'Customer name is required'),
   componentName: z.string().min(1, 'Component name is required'),
   qty: z.coerce.number().int().positive('Quantity must be positive'),
@@ -58,6 +70,9 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const SHIFT_VALUES = ['First', 'Second', 'Third', '12hrMng', '12hrNight'] as const;
+const OPN_VALUES = ['preMC', 'first_opn', 'second_opn', 'third_opn', 'fourth_opn', 'R/W'] as const;
 
 const operatorsList = Array.from({ length: 100 }, (_, i) => {
   const num = i + 1;
@@ -89,15 +104,73 @@ function fromAmPmString(dateStr: string, ampmStr: string) {
   return `${dateStr}T${hour.toString().padStart(2, '0')}:${minuteStr}`;
 }
 
-export default function EmployeeEntryForm() {
+function toDateInputValue(value?: string | Date) {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+  return date.toISOString().slice(0, 10);
+}
+
+function mapEntryToFormValues(entry: any): FormValues {
+  const shift = (SHIFT_VALUES as readonly string[]).includes(entry?.shift)
+    ? (entry.shift as FormValues['shift'])
+    : 'First';
+  const opn = (OPN_VALUES as readonly string[]).includes(entry?.opn)
+    ? (entry.opn as FormValues['opn'])
+    : 'preMC';
+
+  return {
+    operatorName: entry?.operatorName || 'Emp001',
+    date: toDateInputValue(entry?.date),
+    shift,
+    machine: entry?.machine || 'TC-1',
+    customerName: entry?.customerName || '',
+    componentName: entry?.componentName || '',
+    qty: Number(entry?.qty) || 0,
+    additionalQty:
+      entry?.additionalQty === 0 || entry?.additionalQty
+        ? Number(entry.additionalQty)
+        : undefined,
+    opn,
+    progNo: entry?.progNo || '',
+    settingTime: entry?.settingTime || '00:00:00',
+    cycleTime: entry?.cycleTime || '00:00:00',
+    handlingTime: entry?.handlingTime || '00:00:00',
+    idleTime: entry?.idleTime || '00:00:00',
+    startTime: entry?.startTime || '01:00:AM',
+    endTime: entry?.endTime || '01:00:PM',
+    remarks: entry?.remarks || '',
+    internalJobOrder: entry?.internalJobOrder || '',
+  };
+}
+
+interface EmployeeEntryFormProps {
+  initialData?: any;
+  /** Admin edit mode: hide entries tab, update employeeForm by id, redirect on success */
+  adminEdit?: boolean;
+  onUpdateSuccess?: () => void;
+}
+
+export default function EmployeeEntryForm({
+  initialData,
+  adminEdit = false,
+  onUpdateSuccess,
+}: EmployeeEntryFormProps = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerAdminEntry, setCustomerList] = useState<any[]>([]);
   const [totalQtySave, setTotalQty] = useState<any>({});
-  const [showUpdateBtn, setShowUpdateBtn] = useState(false);
+  const [entryId, setEntryId] = useState<string | undefined>(
+    initialData?._id ? String(initialData._id) : undefined
+  );
+  const [showUpdateBtn, setShowUpdateBtn] = useState(!!initialData?._id);
   const [modalVisible, setModalVisible] = useState(false);
   const [loader, setLoader] = useState(false);
-  const [totalProductionHr, setTotalProductionHr] = useState('');
-  const [totalWorkingHrs, setTotalWorkingHrs] = useState('');
+  const [totalProductionHr, setTotalProductionHr] = useState(
+    initialData?.totalProductionHr ? String(initialData.totalProductionHr) : ''
+  );
+  const [totalWorkingHrs, setTotalWorkingHrs] = useState(
+    initialData?.totalWorkingHrs ? String(initialData.totalWorkingHrs) : ''
+  );
   const [isCheckingQty, setIsCheckingQty] = useState(false);
   const [formValues, setFormValues] = useState<any>({});
   const router = useRouter();
@@ -105,30 +178,33 @@ export default function EmployeeEntryForm() {
 
   const [startTimeInput, setStartTimeInput] = useState('');
   const [endTimeInput, setEndTimeInput] = useState('');
+  const [machinesList, setMachinesList] = useState<string[]>([...DEFAULT_MACHINES]);
 
-  const defaultValues: FormValues = {
-    operatorName: 'Emp001',
-    date: new Date().toISOString().slice(0, 10),
-    shift: 'First',
-    machine: 'TC-1',
-    customerName: '',
-    componentName: '',
-    qty: 0,
-    additionalQty: undefined,
-    opn: 'preMC',
-    progNo: '',
-    settingTime: '00:00:00',
-    cycleTime: '00:00:00',
-    handlingTime: '00:00:00',
-    idleTime: '00:00:00',
-    startTime: '01:00:AM',
-    endTime: '01:00:PM',
-    remarks: '',
-    internalJobOrder: '',
-  };
+  const defaultValues: FormValues = initialData
+    ? mapEntryToFormValues(initialData)
+    : {
+        operatorName: 'Emp001',
+        date: new Date().toISOString().slice(0, 10),
+        shift: 'First',
+        machine: 'TC-1',
+        customerName: '',
+        componentName: '',
+        qty: 0,
+        additionalQty: undefined,
+        opn: 'preMC',
+        progNo: '',
+        settingTime: '00:00:00',
+        cycleTime: '00:00:00',
+        handlingTime: '00:00:00',
+        idleTime: '00:00:00',
+        startTime: '01:00:AM',
+        endTime: '01:00:PM',
+        remarks: '',
+        internalJobOrder: '',
+      };
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues,
     mode: 'onBlur',
   });
@@ -138,7 +214,30 @@ export default function EmployeeEntryForm() {
   const watchedQty = form.watch('qty');
 
   useEffect(() => {
+    if (!initialData?._id) return;
+    const mapped = mapEntryToFormValues(initialData);
+    form.reset(mapped);
+    setEntryId(String(initialData._id));
+    setShowUpdateBtn(true);
+    setTotalProductionHr(
+      initialData.totalProductionHr ? String(initialData.totalProductionHr) : ''
+    );
+    setTotalWorkingHrs(
+      initialData.totalWorkingHrs ? String(initialData.totalWorkingHrs) : ''
+    );
+    setStartTimeInput(fromAmPmString(mapped.date, mapped.startTime));
+    setEndTimeInput(fromAmPmString(mapped.date, mapped.endTime));
+  }, [initialData]);
+
+  useEffect(() => {
     fetchCustomer();
+    fetchMachines().then((list) => {
+      setMachinesList(list);
+      // Keep edit value even if not yet in list
+      if (initialData?.machine && !list.includes(initialData.machine)) {
+        setMachinesList([...list, initialData.machine]);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -387,14 +486,14 @@ export default function EmployeeEntryForm() {
         date: isoDate,
         ...(totalProductionHr ? { totalProductionHr } : {}),
         ...(totalWorkingHrs ? { totalWorkingHrs } : {}),
-        ...(showUpdateBtn ? { id: showUpdateBtn } : {}),
+        ...(entryId || showUpdateBtn ? { id: entryId || showUpdateBtn } : {}),
       };
       
       console.log('Payload being sent:', payload);
-      console.log('Request method:', showUpdateBtn ? 'PUT' : 'POST');
+      console.log('Request method:', entryId || showUpdateBtn ? 'PUT' : 'POST');
 
       const response = await fetch('/api/employeeForm', {
-        method: showUpdateBtn ? 'PUT' : 'POST',
+        method: entryId || showUpdateBtn ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -417,17 +516,29 @@ export default function EmployeeEntryForm() {
         setLoader(false);
         setModalVisible(false);
 
+        if (adminEdit) {
+          toast({
+            title: 'Success',
+            description: 'Employee entry updated successfully',
+          });
+          onUpdateSuccess?.();
+          return;
+        }
+
         const shouldEdit = window.confirm(
           'Data saved successfully!!! Click Edit if you need to edit the saved data, Click Ok to create new entry.'
         );
 
         if (!shouldEdit) {
-          setShowUpdateBtn(res.response._id);
+          const newId = res.response?._id ? String(res.response._id) : undefined;
+          setEntryId(newId);
+          setShowUpdateBtn(!!newId);
           toast({
             title: 'Success',
             description: 'Entry saved successfully. You can now edit it.',
           });
         } else {
+          setEntryId(undefined);
           setShowUpdateBtn(false);
           form.reset(defaultValues);
           setTotalProductionHr('');
@@ -486,23 +597,18 @@ export default function EmployeeEntryForm() {
 
   const availableQty = getAvailableQty();
 
-  return (
-    <Tabs defaultValue="form" className="space-y-6">
-      <TabsList>
-        <TabsTrigger value="form">New Entry</TabsTrigger>
-        <TabsTrigger value="entries">All Entries</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="entries">
-        <EmployeeEntriesList />
-      </TabsContent>
-
-      <TabsContent value="form">
+  const formContent = (
     <div className="max-w-2xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Employee Production Entry</CardTitle>
-          <p className="text-center text-muted-foreground">Fill in the production details below</p>
+          <CardTitle className="text-2xl font-bold text-center">
+            {adminEdit ? 'Edit Employee Production Entry' : 'Employee Production Entry'}
+          </CardTitle>
+          <p className="text-center text-muted-foreground">
+            {adminEdit
+              ? 'Correct false or incorrect production details below'
+              : 'Fill in the production details below'}
+          </p>
         </CardHeader>
         <CardContent className="pt-6">
           <Form {...form}>
@@ -511,11 +617,15 @@ export default function EmployeeEntryForm() {
               onSubmit(values);
             }, (errors) => {
               console.error('Form validation errors:', errors);
+              const messages = getValidationErrorMessages(errors);
               toast({
                 title: 'Validation Error',
-                description: 'Please check all required fields and try again.',
+                description: messages.length
+                  ? messages.join('. ')
+                  : 'Please check all required fields and try again.',
                 variant: 'destructive',
               });
+              scrollToFirstError(errors);
             })} className="space-y-6">
               <FormField
                 control={form.control}
@@ -523,7 +633,7 @@ export default function EmployeeEntryForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Operator Name</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12">
                           <SelectValue placeholder="Select operator" />
@@ -549,7 +659,12 @@ export default function EmployeeEntryForm() {
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Date</FormLabel>
                     <FormControl>
-                      <Input type="date" className="h-12" {...field} />
+                      <Input
+                        type="date"
+                        className="h-12"
+                        max={getTodayDateString()}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -562,7 +677,7 @@ export default function EmployeeEntryForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Shift</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12">
                           <SelectValue placeholder="Select shift" />
@@ -587,17 +702,18 @@ export default function EmployeeEntryForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Machine</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12">
                           <SelectValue placeholder="Select machine" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="TC-1">TC-1</SelectItem>
-                        <SelectItem value="TC-2">TC-2</SelectItem>
-                        <SelectItem value="TC-3">TC-3</SelectItem>
-                        <SelectItem value="VMC">VMC</SelectItem>
+                        {machinesList.map((machine) => (
+                          <SelectItem key={machine} value={machine}>
+                            {machine}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -611,7 +727,7 @@ export default function EmployeeEntryForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Customer Name</FormLabel>
-                    <Select onValueChange={handleCustomerChange} defaultValue={field.value}>
+                    <Select onValueChange={handleCustomerChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12">
                           <SelectValue placeholder="Select customer" />
@@ -652,7 +768,7 @@ export default function EmployeeEntryForm() {
                           console.error('Error updating component:', error);
                         }
                       }} 
-                      defaultValue={field.value}
+                      value={field.value || undefined}
                       disabled={!watchedCustomer || customerAdminEntry.filter((entry: any) => entry.customerName === watchedCustomer).length === 0}
                     >
                       <FormControl>
@@ -763,7 +879,7 @@ export default function EmployeeEntryForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">OPN</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12">
                           <SelectValue placeholder="Select OPN" />
@@ -805,7 +921,7 @@ export default function EmployeeEntryForm() {
                     <FormLabel className="text-base font-semibold">Internal Job Order</FormLabel>
                     <Select
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value || undefined}
                       disabled={!watchedCustomer || customerAdminEntry.length === 0}
                     >
                       <FormControl>
@@ -963,7 +1079,7 @@ export default function EmployeeEntryForm() {
                   }}
                 >
                   {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                  {showUpdateBtn ? 'UPDATE' : 'SUBMIT'}
+                  {entryId || showUpdateBtn ? 'UPDATE' : 'SUBMIT'}
                 </Button>
               </div>
             </form>
@@ -1023,6 +1139,25 @@ export default function EmployeeEntryForm() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+
+  if (adminEdit) {
+    return formContent;
+  }
+
+  return (
+    <Tabs defaultValue="form" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="form">New Entry</TabsTrigger>
+        <TabsTrigger value="entries">All Entries</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="entries">
+        <EmployeeEntriesList />
+      </TabsContent>
+
+      <TabsContent value="form">
+        {formContent}
       </TabsContent>
     </Tabs>
   );

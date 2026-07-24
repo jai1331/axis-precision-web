@@ -41,6 +41,8 @@ import {
 } from '@/components/ui/popover';
 import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getTodayDateString, getValidationErrorMessages, isFutureDate, scrollToFirstError } from '@/lib/formValidation';
+import { DEFAULT_MACHINES, fetchMachines } from '@/lib/machines';
 
 const formSchema = z.object({
   customerName: z.string().min(2, 'Customer name must be at least 2 characters'),
@@ -61,7 +63,12 @@ const formSchema = z.object({
   startTime: z.string().min(1, 'Start time is required'),
   endTime: z.string().min(1, 'End time is required'),
   remarks: z.string().optional(),
-  dateOfEntry: z.string().min(1, 'Date of entry is required'),
+  dateOfEntry: z
+    .string()
+    .min(1, 'Date of entry is required')
+    .refine((value) => !isFutureDate(value), {
+      message: 'Future date is not allowed',
+    }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -83,7 +90,7 @@ export default function ProductForm({ initialData }: ProductFormProps = {}) {
   const [customerData, setCustomerData] = useState<any[]>([]);
   const [customersList, setCustomersList] = useState<string[]>([]);
   const [componentsList, setComponentsList] = useState<string[]>([]);
-  const [machinesList] = useState(['TC-1', 'TC-2', 'TC-3', 'VMC']);
+  const [machinesList, setMachinesList] = useState<string[]>([...DEFAULT_MACHINES]);
   const [operatorsList, setOperatorsList] = useState<string[]>([]);
   const router = useRouter();
   const { toast } = useToast();
@@ -117,6 +124,7 @@ export default function ProductForm({ initialData }: ProductFormProps = {}) {
 
   useEffect(() => {
     fetchCustomerData();
+    fetchMachines().then(setMachinesList);
   }, []);
 
   const fetchCustomerData = async () => {
@@ -218,6 +226,18 @@ export default function ProductForm({ initialData }: ProductFormProps = {}) {
     }
   };
 
+  const onInvalid = (errors: any) => {
+    const messages = getValidationErrorMessages(errors);
+    toast({
+      title: 'Validation Error',
+      description: messages.length
+        ? messages.join('. ')
+        : 'Please check all required fields and try again.',
+      variant: 'destructive',
+    });
+    scrollToFirstError(errors);
+  };
+
   const findCustomer = (query: string) => {
     if (query) {
       const regex = new RegExp(query.trim(), 'i');
@@ -272,7 +292,7 @@ export default function ProductForm({ initialData }: ProductFormProps = {}) {
     <Card>
       <CardContent className="pt-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {/* Customer Name */}
               <FormField
@@ -713,7 +733,7 @@ export default function ProductForm({ initialData }: ProductFormProps = {}) {
                   <FormItem>
                     <FormLabel>Date of Entry</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" max={getTodayDateString()} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

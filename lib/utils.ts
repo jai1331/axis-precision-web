@@ -127,7 +127,9 @@ export const updateAdmitEntryForm = async (values: any, _id: string, type: strin
   try {
     const response = await fetch(`/api/${urlType}`, requestOptions);
     const body = await response.json();
-    if (response.status !== 200) throw Error(body.message);
+    if (!response.ok) {
+      throw Error(body.message || body.error || 'Failed to update entry');
+    }
     return body;
   } catch (error) {
     console.error('Update error:', error);
@@ -501,6 +503,7 @@ export const summaryData = {
     'tc1': {},
     'tc2': {},
     'VMC': {},
+    'VMC-2': {},
     'tc3': {}
   },
   'Total production Hr': '',

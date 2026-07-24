@@ -25,7 +25,10 @@ export interface DashboardSummary {
   tc1ProdTime: string;
   tc2ProdTime: string;
   vmcProdTime: string;
+  vmc2ProdTime: string;
   tc3ProdTime: string;
+  /** All machines (including admin-added) → formatted production time */
+  machineProdTimes?: Record<string, string>;
 }
 
 export interface ProductionRecord {

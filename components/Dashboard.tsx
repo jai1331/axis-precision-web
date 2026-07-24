@@ -54,6 +54,7 @@ import { DashboardSummary } from '@/types';
 import AnalyticsTab from './AnalyticsTab';
 import * as XLSX from 'xlsx';
 import { getEmployeeData, getCustomerList, formatDate, getTotalMachineHrs, getTotalIdleTime, getTotalWorkingHrs, addTimes } from '@/lib/utils';
+import { getTodayDateString, isFutureDate } from '@/lib/formValidation';
 import { useToast } from '@/hooks/use-toast';
 
 // Production data will be fetched from API
@@ -164,33 +165,6 @@ export default function Dashboard() {
         // Calculate dashboard summary - matches React Native logic exactly
         const totalProducts = finalData.length;
 
-        // Machine breakdown for Production Summary - matches React Native exactly
-        const tc1Components = finalData.filter((obj: any) => obj.machine === 'TC-1');
-        const tc2Components = finalData.filter((obj: any) => obj.machine === 'TC-2');
-        const vmcComponents = finalData.filter((obj: any) => obj.machine === 'VMC');
-        const tc3Components = finalData.filter((obj: any) => obj.machine === 'TC-3');
-        
-        // Debug: Log machine counts
-        console.log('Machine counts:', {
-          'TC-1': tc1Components.length,
-          'TC-2': tc2Components.length,
-          'VMC': vmcComponents.length,
-          'TC-3': tc3Components.length
-        });
-        
-        const totalProdTc1Time = getTotalMachineHrs(tc1Components, false) as { machineTotalTime: string; componentWiseMachiHrObj: any };
-        const totalProdTc2Time = getTotalMachineHrs(tc2Components, false) as { machineTotalTime: string; componentWiseMachiHrObj: any };
-        const totalProdVMCTime = getTotalMachineHrs(vmcComponents, false) as { machineTotalTime: string; componentWiseMachiHrObj: any };
-        const totalProdTc3Time = getTotalMachineHrs(tc3Components, false) as { machineTotalTime: string; componentWiseMachiHrObj: any };
-        
-        // Debug: Log machine total times
-        console.log('Machine total times:', {
-          'TC-1': totalProdTc1Time.machineTotalTime,
-          'TC-2': totalProdTc2Time.machineTotalTime,
-          'VMC': totalProdVMCTime.machineTotalTime,
-          'TC-3': totalProdTc3Time.machineTotalTime
-        });
-
         // Format machine times exactly like React Native
         const formatMachineTimeFromString = (timeString: string) => {
           if (!timeString || timeString === '00:00:00') return '0hr 0mins 0sec';
@@ -201,10 +175,42 @@ export default function Dashboard() {
           return `${hours}hr ${minutes}mins ${seconds}sec`;
         };
 
-        const tc1ProdTime = formatMachineTimeFromString(totalProdTc1Time.machineTotalTime);
-        const tc2ProdTime = formatMachineTimeFromString(totalProdTc2Time.machineTotalTime);
-        const vmcProdTime = formatMachineTimeFromString(totalProdVMCTime.machineTotalTime);
-        const tc3ProdTime = formatMachineTimeFromString(totalProdTc3Time.machineTotalTime);
+        // Group by machine dynamically (supports admin-added machines)
+        const machineGroups: Record<string, any[]> = {};
+        finalData.forEach((obj: any) => {
+          const machine = obj.machine || obj.machineName || 'Unknown';
+          if (!machineGroups[machine]) machineGroups[machine] = [];
+          machineGroups[machine].push(obj);
+        });
+
+        const machineProdTimesRaw: Record<string, string> = {};
+        const machineProdTimes: Record<string, string> = {};
+        let toalProdHrsReCalcOverall = '00:00:00';
+
+        Object.entries(machineGroups).forEach(([machine, components]) => {
+          const result = getTotalMachineHrs(components, false) as {
+            machineTotalTime: string;
+            componentWiseMachiHrObj: any;
+          };
+          machineProdTimesRaw[machine] = result.machineTotalTime || '00:00:00';
+          machineProdTimes[machine] = formatMachineTimeFromString(result.machineTotalTime);
+          toalProdHrsReCalcOverall = addTimes(
+            toalProdHrsReCalcOverall,
+            result.machineTotalTime || '00:00:00',
+            '00:00:00'
+          );
+        });
+
+        console.log('Machine counts:', Object.fromEntries(
+          Object.entries(machineGroups).map(([k, v]) => [k, v.length])
+        ));
+        console.log('Machine total times:', machineProdTimesRaw);
+
+        const tc1ProdTime = machineProdTimes['TC-1'] || '0hr 0mins 0sec';
+        const tc2ProdTime = machineProdTimes['TC-2'] || '0hr 0mins 0sec';
+        const vmcProdTime = machineProdTimes['VMC'] || '0hr 0mins 0sec';
+        const vmc2ProdTime = machineProdTimes['VMC-2'] || '0hr 0mins 0sec';
+        const tc3ProdTime = machineProdTimes['TC-3'] || '0hr 0mins 0sec';
 
         // Calculate total idle time
         const totalIdleTime = getTotalIdleTime(finalData);
@@ -223,11 +229,6 @@ export default function Dashboard() {
         const workingMin = parseFloat(totalWorkingHrsData.totalWorkingHrs.split(":")[1]);
         const totalWorkingHr = `${workingHr}hr ${workingMin}mins`;
 
-        // Calculate total production hours - matches React Native exactly
-        const toalProdHrs = addTimes(totalProdTc1Time.machineTotalTime, totalProdTc2Time.machineTotalTime, '00:00:00');
-        const toalProdHrsReCalc = addTimes(toalProdHrs, totalProdVMCTime.machineTotalTime, '00:00:00');
-        const toalProdHrsReCalcOverall = addTimes(toalProdHrsReCalc, totalProdTc3Time.machineTotalTime, '00:00:00');
-        
         // Format total production hours like React Native
         const formatTotalProdTime = (timeString: string) => {
           if (!timeString || timeString === '00:00:00') return '0hr 0mins 0sec';
@@ -285,7 +286,9 @@ export default function Dashboard() {
           tc1ProdTime,
           tc2ProdTime,
           vmcProdTime,
-          tc3ProdTime
+          vmc2ProdTime,
+          tc3ProdTime,
+          machineProdTimes,
         });
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -373,6 +376,28 @@ export default function Dashboard() {
   };
 
   const saveFilters = () => {
+    if (isFutureDate(tempFilters.startDate) || isFutureDate(tempFilters.endDate)) {
+      toast({
+        title: 'Validation Error',
+        description: 'Future date is not allowed in start/end date filters',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (
+      tempFilters.startDate &&
+      tempFilters.endDate &&
+      tempFilters.startDate > tempFilters.endDate
+    ) {
+      toast({
+        title: 'Validation Error',
+        description: 'Start date cannot be after end date',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     console.log('Saving filters:', tempFilters);
     setFilters(tempFilters);
   };
@@ -474,15 +499,23 @@ export default function Dashboard() {
   };
 
   const getMachineHrsAccurate = (machineName: string) => {
-    if(machineName === 'TC1'){
-      return data?.tc1ProdTime;
-    }else if(machineName === 'TC2'){
-      return data?.tc2ProdTime;
-    }else if(machineName === 'VMC'){
-      return data?.vmcProdTime;
-    }else if(machineName === 'TC3'){
-      return data?.tc3ProdTime;
-    }
+    const key = String(machineName || '');
+    const withHyphen = key.includes('-')
+      ? key
+      : key.replace(/^(TC)(\d+)$/i, '$1-$2').replace(/^(VMC)(\d+)$/i, '$1-$2');
+    const fromMap =
+      data?.machineProdTimes?.[key] ||
+      data?.machineProdTimes?.[withHyphen] ||
+      data?.machineProdTimes?.[key.toUpperCase()] ||
+      data?.machineProdTimes?.[withHyphen.toUpperCase()];
+
+    if (fromMap) return fromMap;
+
+    if (key === 'TC1' || key === 'TC-1') return data?.tc1ProdTime;
+    if (key === 'TC2' || key === 'TC-2') return data?.tc2ProdTime;
+    if (key === 'VMC') return data?.vmcProdTime;
+    if (key === 'VMC2' || key === 'VMC-2') return data?.vmc2ProdTime;
+    if (key === 'TC3' || key === 'TC-3') return data?.tc3ProdTime;
     return '00:00:00';
   };
 
@@ -669,6 +702,7 @@ export default function Dashboard() {
                     type="date"
                     placeholder="Start date"
                     className="pl-10"
+                    max={getTodayDateString()}
                     value={tempFilters.startDate}
                     onChange={(e) => handleTempFilterChange('startDate', e.target.value)}
                   />
@@ -681,6 +715,7 @@ export default function Dashboard() {
                     type="date"
                     placeholder="End date"
                     className="pl-10"
+                    max={getTodayDateString()}
                     value={tempFilters.endDate}
                     onChange={(e) => handleTempFilterChange('endDate', e.target.value)}
                   />
