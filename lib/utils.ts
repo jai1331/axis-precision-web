@@ -107,6 +107,15 @@ export const getCustomerList = async () => {
   }
 };
 
+/** Generate job order as API-{YY}-{MM}-{NNN} where NNN is total entries + 1 */
+export function generateJobOrderNumber(totalEntries: number): string {
+  const now = new Date();
+  const year = String(now.getFullYear()).slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const series = String(totalEntries + 1).padStart(3, '0');
+  return `API-${year}-${month}-${series}`;
+}
+
 // Update admin entry form
 export const updateAdmitEntryForm = async (values: any, _id: string, type: string = "admin") => {
   const myHeaders = new Headers();

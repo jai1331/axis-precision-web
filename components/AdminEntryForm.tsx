@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/popover';
 import { Loader2, Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCustomerList, saveAdminEntryForm, updateAdmitEntryForm } from '@/lib/utils';
+import { getCustomerList, saveAdminEntryForm, updateAdmitEntryForm, generateJobOrderNumber } from '@/lib/utils';
 import { getValidationErrorMessages, scrollToFirstError } from '@/lib/formValidation';
 
 const formSchema = z.object({
@@ -108,6 +108,26 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
     }
   }, [initialData]);
 
+  const isEditMode = !!(entryId || initialData?._id || showUpdateBtn);
+
+  const resetFormForNewEntry = (entryCount: number) => {
+    form.reset({
+      customerName: '',
+      componentName: '',
+      qty: 0,
+      dcno: '',
+      internalJobOrder: generateJobOrderNumber(entryCount),
+      supplierName: '',
+      rawMaterialPricePerKg: 0,
+      materialGrade: '',
+      rawMaterialCost: 0,
+    });
+    setCustomerSearch('');
+    setComponentSearch('');
+    setEntryId(undefined);
+    setShowUpdateBtn(false);
+  };
+
   // Replicate the fetchCustomer function from React Native
   const fetchCustomer = async () => {
     setIsLoading(true);
@@ -124,7 +144,16 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
         // Get unique component names
         const uniqueComponents = [...new Set<string>(data.map((item: any) => item.componentName as string))];
         setFilteredComponents(uniqueComponents);
+
+        // Auto-generate job order for new entries
+        if (!initialData?._id && !entryId && !form.getValues('internalJobOrder')) {
+          form.setValue('internalJobOrder', generateJobOrderNumber(data.length));
+        }
+      } else if (!initialData?._id && !entryId && !form.getValues('internalJobOrder')) {
+        form.setValue('internalJobOrder', generateJobOrderNumber(0));
       }
+
+      return data;
     } catch (error) {
       console.error('Error fetching customer data:', error);
       toast({
@@ -199,9 +228,14 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
       }
 
       if (res && res.status === 'ok') {
+        const syncedCount = (res as any).employeeSyncedCount ?? 0;
         toast({
           title: 'Success',
-          description: entryId ? 'Admin entry updated successfully' : 'Admin entry added successfully',
+          description: entryId
+            ? syncedCount > 0
+              ? `Admin entry updated. ${syncedCount} employee/dashboard record(s) synced.`
+              : 'Admin entry updated successfully'
+            : 'Admin entry added successfully',
         });
 
         if (!entryId) {
@@ -222,13 +256,9 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
             return;
           }
           
-          // Reset form for new entry
-          form.reset(defaultValues);
-          setCustomerSearch('');
-          setComponentSearch('');
-          setEntryId(undefined);
-          setShowUpdateBtn(false);
-          fetchCustomer();
+          // Reset form for new entry with next job order number
+          const data = await fetchCustomer();
+          resetFormForNewEntry(data?.length ?? customerData.length);
         } else {
           router.push('/admin');
         }
@@ -502,8 +532,18 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Internal Job Order</FormLabel>
                     <FormControl>
-                      <Input className="h-12" {...field} />
+                      <Input
+                        className="h-12"
+                        disabled={isEditMode}
+                        placeholder={isEditMode ? undefined : 'Auto-generated, editable'}
+                        {...field}
+                      />
                     </FormControl>
+                    {!isEditMode && (
+                      <p className="text-sm text-muted-foreground">
+                        Auto-generated as API-YY-MM-NNN. You can edit before saving.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

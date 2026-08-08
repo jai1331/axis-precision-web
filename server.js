@@ -352,6 +352,11 @@ app.put('/api/updateAdmitEntryForm', async(req, res) => {
 			return res.status(400).json({ status: 'error', message: 'Entry id is required' });
 		}
 
+		const existingEntry = await adminEntryForm.findById(entryId);
+		if (!existingEntry) {
+			return res.status(404).json({ status: 'error', message: 'Admin entry not found' });
+		}
+
 		const updateData = {
 			customerName: req.body.customerName,
 			componentName: req.body.componentName,
@@ -370,12 +375,21 @@ app.put('/api/updateAdmitEntryForm', async(req, res) => {
 			{ new: true, runValidators: true }
 		);
 
-		if (!response) {
-			return res.status(404).json({ status: 'error', message: 'Admin entry not found' });
+		let employeeSyncedCount = 0;
+		if (req.body.componentName !== existingEntry.componentName) {
+			const syncResult = await employeeForm.updateMany(
+				{
+					customerName: existingEntry.customerName,
+					internalJobOrder: existingEntry.internalJobOrder,
+					componentName: existingEntry.componentName,
+				},
+				{ $set: { componentName: req.body.componentName } }
+			);
+			employeeSyncedCount = syncResult.modifiedCount;
 		}
 
-		console.log('response', response);
-		return res.json({ status: 'ok', response: response });
+		console.log('response', response, 'employeeSyncedCount', employeeSyncedCount);
+		return res.json({ status: 'ok', response: response, employeeSyncedCount });
 	  } catch (err) {
 		res.status(500).json({ message: err.message });
 	  }
