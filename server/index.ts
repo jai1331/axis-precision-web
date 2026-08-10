@@ -370,7 +370,7 @@ app.put('/api/updateAdmitEntryForm', async (req: Request, res: Response) => {
         },
         { $set: { componentName: req.body.componentName } }
       );
-      employeeSyncedCount = syncResult.modifiedCount;
+      employeeSyncedCount = syncResult.nModified ?? 0;
     }
 
     console.log('response', response, 'employeeSyncedCount', employeeSyncedCount);

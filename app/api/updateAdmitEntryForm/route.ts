@@ -129,7 +129,7 @@ export async function PUT(request: NextRequest) {
         },
         { $set: { componentName: body.componentName } }
       );
-      employeeSyncedCount = syncResult.modifiedCount;
+      employeeSyncedCount = syncResult.nModified ?? 0;
     }
 
     return NextResponse.json(
