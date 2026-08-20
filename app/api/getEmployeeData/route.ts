@@ -1,39 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+import { fetchEmployeeRecords } from '@/lib/employeeDateQuery.js';
 
 export const dynamic = 'force-dynamic';
 
+const connectDB = async () => {
+  if (mongoose.connections[0].readyState) return;
+
+  const password = 'IronMan';
+  const mongoUri = `mongodb+srv://admin:${password}@cluster0.b0eqn.mongodb.net/login-app-db?retryWrites=true&w=majority&appName=Cluster0`;
+
+  await mongoose.connect(mongoUri);
+};
+
+const employeeFormSchema = new mongoose.Schema(
+  {},
+  { collection: 'employeeForm', strict: false }
+);
+
+const getEmployeeFormModel = () => {
+  return mongoose.models.employeeForm || mongoose.model('employeeForm', employeeFormSchema);
+};
+
 export async function GET(request: NextRequest) {
   try {
-    // const { searchParams } = new URL(request.url);
     const { searchParams } = request.nextUrl;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    const apiUrl = `https://axis-precision-app.onrender.com/api/getEmployeeData?startDate=${startDate}&endDate=${endDate}`;
+    await connectDB();
+    const EmployeeForm = getEmployeeFormModel();
 
-    console.log('Proxying getEmployeeData request to:', apiUrl);
+    const data = await fetchEmployeeRecords(EmployeeForm, startDate, endDate);
 
-    const response = await fetch(apiUrl, {
-      method: 'GET',
+    return NextResponse.json(data, {
       headers: {
-        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
       },
-      cache: 'no-store', // 👈 important for server freshness
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Production server error:', errorText);
-      return NextResponse.json(
-        { error: 'Failed to fetch employee data' },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('getEmployeeData error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch employee data' },
       { status: 500 }

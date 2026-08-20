@@ -59,6 +59,7 @@ const connectDB = async () => {
 import User from './models/User';
 import AdminEntryForm from './models/AdminEntryForm';
 import EmployeeForm from './models/EmployeeForm';
+import { fetchEmployeeRecords } from '../lib/employeeDateQuery.js';
 
 // Authentication middleware
 const authenticateToken = (req: Request, res: Response, next: any) => {
@@ -232,7 +233,7 @@ app.post('/api/employeeForm', async (req: Request, res: Response) => {
     finalDate = date;
   } else {
     let startDateFormatted = `${date.split('-')[1]}-${date.split('-')[0]}-${date.split('-')[2]}`;
-    finalDate = new Date(startDateFormatted).toISOString();
+    finalDate = new Date(startDateFormatted);
   }
 
   console.log('date', date, 'moment', finalDate);
@@ -271,40 +272,16 @@ app.post('/api/employeeForm', async (req: Request, res: Response) => {
 app.get('/api/getEmployeeData', async (req: Request, res: Response) => {
   console.log('get call', req.query);
   const { startDate, endDate } = req.query;
-  console.log('req.query', req.query);
-  console.log(moment(new Date(startDate as string)).format('DD-MM-YYYY'), moment(new Date(endDate as string)).format('DD-MM-YYYY'), 'endDate', moment(endDate as string), 'n', `${(endDate as string).split('-')[1]}-${(endDate as string).split('-')[0]}-${(endDate as string).split('-')[2]}`);
-  
+
   try {
-    let response;
-    let endDateFormatted = `${(endDate as string).split('-')[1]}-${(endDate as string).split('-')[0]}-${(endDate as string).split('-')[2]}`;
-    let startDateFormatted = `${(startDate as string).split('-')[1]}-${(startDate as string).split('-')[0]}-${(startDate as string).split('-')[2]}`;
-    
-    console.log("start date", String(startDate) === String(endDate), 'endDate', 
-      endDate, moment(endDate as string).endOf('day').toDate(), 'endDateFormatted', moment(endDateFormatted).endOf('day').toDate(),
-      'startDateFormatted', startDateFormatted, moment(startDateFormatted).format('MM-DD-YYYY'), 'j', moment(startDateFormatted).startOf('day').toDate(),
-      'new Date', moment(endDateFormatted).endOf('day').toDate().toISOString()
+    const response = await fetchEmployeeRecords(
+      EmployeeForm,
+      startDate as string | undefined,
+      endDate as string | undefined
     );
-    
-    let queryStr: any = {
-      "date": {
-        "$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-      }
-    };
-    
-    if (req.query.startDate && (String(startDate) !== String(endDate))) {
-      queryStr = {
-        "date": {
-          "$gte": new Date(startDateFormatted).toISOString(),
-          "$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-        }
-      };
-    }
-    
-    console.log('queryStr', queryStr);
-    response = await EmployeeForm.find(queryStr).sort({ date: -1 });
-    
+
     if (response) {
-      console.log('response', response, response.length);
+      console.log('response', response.length);
       return res.json(response);
     }
   } catch (err: any) {
@@ -393,7 +370,7 @@ app.put('/api/updateEmployeeForm', async (req: Request, res: Response) => {
     let finalDate = req.body.date;
     if (req.body.date && !String(req.body.date).includes('T')) {
       let startDateFormatted = `${req.body.date.split('-')[1]}-${req.body.date.split('-')[0]}-${req.body.date.split('-')[2]}`;
-      finalDate = new Date(startDateFormatted).toISOString();
+      finalDate = new Date(startDateFormatted);
     }
 
     console.log('date', req.body.date, 'moment', finalDate);
@@ -424,32 +401,17 @@ app.get('/api/downloadExcel', async (req: Request, res: Response) => {
   const { startDate, endDate } = req.query;
   
   try {
-    let response;
-    let endDateFormatted = `${(endDate as string).split('-')[1]}-${(endDate as string).split('-')[0]}-${(endDate as string).split('-')[2]}`;
-    let startDateFormatted = `${(startDate as string).split('-')[1]}-${(startDate as string).split('-')[0]}-${(startDate as string).split('-')[2]}`;
-    
-    let queryStr: any = {
-      "date": {
-        "$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-      }
-    };
-    
-    if (req.query.startDate && (String(startDate) !== String(endDate))) {
-      queryStr = {
-        "date": {
-          "$gte": new Date(startDateFormatted).toISOString(),
-          "$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-        }
-      };
-    }
-    
-    console.log('queryStr', queryStr);
+    const response = await fetchEmployeeRecords(
+      EmployeeForm,
+      startDate as string | undefined,
+      endDate as string | undefined
+    );
+
+    console.log('downloadExcel records', response.length);
     var wb = XLSX.utils.book_new(); 
-    response = await EmployeeForm.find(queryStr).sort({ date: -1 });
     
     if (response) {
       console.log('response', response.length);
-      // Remove JSON.stringify/parse, pass response directly
       var ws = XLSX.utils.json_to_sheet(response);
       var down = path.join(__dirname, 'exportdata.xlsx');
       XLSX.utils.book_append_sheet(wb, ws, "sheet1");

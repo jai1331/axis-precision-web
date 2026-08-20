@@ -244,7 +244,7 @@ app.post('/api/employeeForm', async(req, res) => {
 		finalDate = date;
 	} else {
 		let startDateFormatted = `${date.split('-')[1]}-${date.split('-')[0]}-${date.split('-')[2]}`;
-		finalDate = new Date(startDateFormatted).toISOString()
+		finalDate = new Date(startDateFormatted);
 	}
 
 	console.log('date', date, 'moment', finalDate);
@@ -271,50 +271,17 @@ app.post('/api/employeeForm', async(req, res) => {
 	}
 });
 
+const { fetchEmployeeRecords } = require('./lib/employeeDateQuery');
+
 app.get('/api/getEmployeeData', async (req, res) => {
   console.log('get call', req.query);
   const { startDate, endDate } = req.query;
 
   try {
-    let queryStr = {};
-
-    // Handle empty startDate - if startDate is empty, get all data up to endDate
-    if (!startDate || startDate === '') {
-      if (endDate) {
-        const endDateFormatted = `${endDate.split('-')[1]}-${endDate.split('-')[0]}-${endDate.split('-')[2]}`;
-        queryStr = {
-          date: {
-            $lt: moment(endDateFormatted).endOf('day').toDate().toISOString(),
-          },
-        };
-      }
-    } else {
-      // Both startDate and endDate are provided
-      const startDateFormatted = `${startDate.split('-')[1]}-${startDate.split('-')[0]}-${startDate.split('-')[2]}`;
-      const endDateFormatted = `${endDate.split('-')[1]}-${endDate.split('-')[0]}-${endDate.split('-')[2]}`;
-
-      if (String(startDate) === String(endDate)) {
-        queryStr = {
-          date: {
-            $lt: moment(endDateFormatted).endOf('day').toDate().toISOString(),
-          },
-        };
-      } else {
-        queryStr = {
-          date: {
-            $gte: new Date(startDateFormatted).toISOString(),
-            $lt: moment(endDateFormatted).endOf('day').toDate().toISOString(),
-          },
-        };
-      }
-    }
-
-    console.log('queryStr', queryStr);
-
-    const response = await employeeForm.find(queryStr).sort({ date: -1 });
+    const response = await fetchEmployeeRecords(employeeForm, startDate, endDate);
 
     if (response) {
-      console.log('response', response, response.length);
+      console.log('response', response.length);
       return res.json(response);
     }
   } catch (err) {
@@ -406,7 +373,7 @@ app.put('/api/updateEmployeeForm', async(req, res) => {
 		let finalDate = req.body.date;
 		if (req.body.date && !String(req.body.date).includes('T')) {
 			let startDateFormatted = `${req.body.date.split('-')[1]}-${req.body.date.split('-')[0]}-${req.body.date.split('-')[2]}`;
-			finalDate = new Date(startDateFormatted).toISOString();
+			finalDate = new Date(startDateFormatted);
 		}
 
 		console.log('date', req.body.date, 'moment', finalDate);
@@ -473,32 +440,9 @@ app.get('/api/downloadExcel', async(req, res) => {
 	console.log('get call', req.query);
 	const { startDate, endDate } = req.query;
 	try {
-		let response;
-		let endDateFormatted = `${endDate.split('-')[1]}-${endDate.split('-')[0]}-${endDate.split('-')[2]}`;
-		let startDateFormatted = `${startDate.split('-')[1]}-${startDate.split('-')[0]}-${startDate.split('-')[2]}`;
-		let queryStr = {
-			"date": {
-				"$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-			}
-		};
-		if(req.query.startDate && (String(startDate) !== String(endDate))) {
-			queryStr = {
-				"date": {
-					"$gte": new Date(startDateFormatted).toISOString(),
-					"$lt": moment(endDateFormatted).endOf('day').toDate().toISOString()
-				}
-			}
-		}
-		console.log('queryStr', queryStr);
+		const response = await fetchEmployeeRecords(employeeForm, startDate, endDate);
+		console.log('downloadExcel records', response.length);
 		var wb = XLSX.utils.book_new(); 
-		response = await employeeForm.find(queryStr, function(err, result) {
-			if (err) {
-			  console.log('err', err);
-			  return err;
-			} else {
-			  return result;
-			}
-		}).sort({ date: -1 });
 		if(response) {
 			console.log('response', response.length);
 			var temp = JSON.stringify(response);

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import EmployeeForm from '../models/EmployeeForm';
+import { fetchEmployeeRecords } from '../../lib/employeeDateQuery.js';
 import moment from 'moment';
 import * as XLSX from 'xlsx';
 import path from 'path';
@@ -35,7 +36,7 @@ export const createEmployeeEntry = async (req: Request, res: Response) => {
       finalDate = date;
     } else {
       const startDateFormatted = `${date.split('-')[1]}-${date.split('-')[0]}-${date.split('-')[2]}`;
-      finalDate = new Date(startDateFormatted).toISOString();
+      finalDate = new Date(startDateFormatted);
     }
 
     const response = await EmployeeForm.create({
@@ -73,34 +74,13 @@ export const createEmployeeEntry = async (req: Request, res: Response) => {
 export const getEmployeeData = async (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.query;
-    
-    let queryStr: any = {};
-    
-    if (endDate) {
-      const endDateFormatted = `${endDate.toString().split('-')[1]}-${endDate.toString().split('-')[0]}-${endDate.toString().split('-')[2]}`;
-      queryStr.date = {
-        $lt: moment(endDateFormatted).endOf('day').toDate().toISOString()
-      };
-    }
-    
-    if (startDate && String(startDate) !== String(endDate)) {
-      const startDateFormatted = `${startDate.toString().split('-')[1]}-${startDate.toString().split('-')[0]}-${startDate.toString().split('-')[2]}`;
-      const endDateFormatted = endDate ? `${endDate.toString().split('-')[1]}-${endDate.toString().split('-')[0]}-${endDate.toString().split('-')[2]}` : null;
-      
-      if (endDateFormatted) {
-        queryStr.date = {
-          $gte: new Date(startDateFormatted).toISOString(),
-          $lt: moment(endDateFormatted).endOf('day').toDate().toISOString()
-        };
-      } else {
-        queryStr.date = {
-          $gte: new Date(startDateFormatted).toISOString()
-        };
-      }
-    }
 
-    const response = await EmployeeForm.find(queryStr).sort({ date: -1 });
-    
+    const response = await fetchEmployeeRecords(
+      EmployeeForm,
+      startDate as string | undefined,
+      endDate as string | undefined
+    );
+
     if (response) {
       return res.json(response);
     }
@@ -121,7 +101,7 @@ export const updateEmployeeEntry = async (req: Request, res: Response) => {
         finalDate = date;
       } else {
         const startDateFormatted = `${date.split('-')[1]}-${date.split('-')[0]}-${date.split('-')[2]}`;
-        finalDate = new Date(startDateFormatted).toISOString();
+        finalDate = new Date(startDateFormatted);
       }
     }
 
