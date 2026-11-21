@@ -85,7 +85,6 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [summaryData, setSummaryData] = useState<any>({});
   const [adminEntries, setAdminEntries] = useState<any[]>([]);
   const [filterOptions, setFilterOptions] = useState({
@@ -98,9 +97,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const [tcPricePerHr, setTcPricePerHr] = useState<string>('250');
   const [vmcPricePerHr, setVmcPricePerHr] = useState<string>('450');
   const [recordsView, setRecordsView] = useState<'cards' | 'table'>('cards');
+  const [tableJobOrderFilter, setTableJobOrderFilter] = useState('all');
   const { toast } = useToast();
 
-  const itemsPerPage = recordsView === 'table' ? 25 : 12;
+  const itemsPerPage = recordsView === 'table' ? 500 : 12;
 
   const [filters, setFilters] = useState<ProductionFilters>({
     search: '',
@@ -155,6 +155,34 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
   // Add this state to track filter application
   const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+
+  const availableTableJobOrders = useMemo(
+    () =>
+      [...new Set(
+        filteredRecords
+          .map((record) => record.internalJobOrder)
+          .filter((jobOrder): jobOrder is string => Boolean(jobOrder?.trim())),
+      )].sort(),
+    [filteredRecords],
+  );
+  const displayedRecords = useMemo(
+    () =>
+      tableJobOrderFilter === 'all'
+        ? filteredRecords
+        : filteredRecords.filter(
+            (record) => record.internalJobOrder === tableJobOrderFilter,
+          ),
+    [filteredRecords, tableJobOrderFilter],
+  );
+
+  useEffect(() => {
+    if (
+      tableJobOrderFilter !== 'all' &&
+      !availableTableJobOrders.includes(tableJobOrderFilter)
+    ) {
+      setTableJobOrderFilter('all');
+    }
+  }, [availableTableJobOrders, tableJobOrderFilter]);
 
   useEffect(() => {
     fetchAdminEntries();
@@ -222,7 +250,6 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
       console.log('Processed records:', allRecords.slice(0, 3));
       setRecords(allRecords);
-      setTotalRecords(allRecords.length);
       setTotalPages(Math.ceil(allRecords.length / itemsPerPage));
       setLoading(false);
     } else if (externalLoading) {
@@ -323,7 +350,6 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   
     // Update filtered records
     setFilteredRecords(filtered);
-    setTotalRecords(filtered.length);
     setTotalPages(Math.ceil(filtered.length / itemsPerPage));
     setCurrentPage(1);
   
@@ -404,6 +430,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     });
   };
 
+  useEffect(() => {
+    calculateSummaryData(displayedRecords);
+  }, [displayedRecords, dashboardData]);
+
   const tcPrice = parseFloat(tcPricePerHr) || 250;
   const vmcPrice = parseFloat(vmcPricePerHr) || 450;
 
@@ -416,7 +446,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       tc1Hrs: 0, tc2Hrs: 0, tc3Hrs: 0, vmcHrs: 0, vmc2Hrs: 0,
       usedAdminQty: false,
     };
-    const data = filteredRecords;
+    const data = displayedRecords;
     if (!data.length) return empty;
 
     // Match admin entry by applied filter supplierName / componentName / opn (from filtered records)
@@ -502,13 +532,14 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       vmc2Hrs,
       usedAdminQty: adminQty != null,
     };
-  }, [filteredRecords, tcPrice, vmcPrice, adminEntries, filters.supplierName, filters.opn]);
+  }, [displayedRecords, tcPrice, vmcPrice, adminEntries, filters.supplierName, filters.opn]);
 
   const hasAppliedFilters =
     !!filters.search ||
     !!filters.startDate ||
     !!filters.endDate ||
     (filters.internalJobOrder && filters.internalJobOrder !== 'all') ||
+    tableJobOrderFilter !== 'all' ||
     (filters.customerName && filters.customerName !== 'all') ||
     (filters.supplierName && filters.supplierName !== 'all') ||
     (filters.materialGrade && filters.materialGrade !== 'all') ||
@@ -616,6 +647,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     setTempFilters(defaultFilters);
     setFilters(defaultFilters);
     setSavedFilters(defaultFilters);
+    setTableJobOrderFilter('all');
 
     // Trigger applyFilters to reset the filtered records
     applyFilters();
@@ -645,7 +677,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
   const handleExportExcel = () => {
     try {
-      const exportData = filteredRecords.map(record => ({
+      const exportData = displayedRecords.map(record => ({
         'Date of Entry': new Date(record.dateOfEntry).toLocaleDateString('en-IN'),
         'Component Name': record.componentName || '',
         'Customer Name': record.customerName || '',
@@ -708,7 +740,17 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Production_Records');
-      XLSX.utils.book_append_sheet(workbook, buildJobOrderSheet(filteredRecords), 'Job Order');
+      XLSX.utils.book_append_sheet(
+        workbook,
+        buildJobOrderSheet(displayedRecords, {
+          tcPricePerHr: tcPrice,
+          vmcPricePerHr: vmcPrice,
+          adminEntries,
+          supplierName: filters.supplierName,
+          opn: filters.opn,
+        }),
+        'Job Order',
+      );
       
       const fileName = `production_records_${new Date().toISOString().slice(0, 10)}.xlsx`;
       XLSX.writeFile(workbook, fileName);
@@ -726,7 +768,8 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     }
   };
 
-  const hasActiveFilters = tempFilters.search || tempFilters.startDate || tempFilters.endDate || 
+  const hasActiveFilters = tempFilters.search || tempFilters.startDate || tempFilters.endDate ||
+    tableJobOrderFilter !== 'all' ||
     (tempFilters.internalJobOrder && tempFilters.internalJobOrder !== 'all') ||
     (tempFilters.customerName && tempFilters.customerName !== 'all') ||
     (tempFilters.supplierName && tempFilters.supplierName !== 'all') ||
@@ -746,13 +789,13 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
 
   // Get paginated records
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedRecords = filteredRecords.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedRecords = displayedRecords.slice(startIndex, startIndex + itemsPerPage);
 
   useEffect(() => {
-    const pages = Math.max(1, Math.ceil(filteredRecords.length / itemsPerPage));
+    const pages = Math.max(1, Math.ceil(displayedRecords.length / itemsPerPage));
     setTotalPages(pages);
     setCurrentPage((prev) => Math.min(prev, pages));
-  }, [recordsView, itemsPerPage, filteredRecords.length]);
+  }, [recordsView, itemsPerPage, displayedRecords.length]);
 
   useEffect(() => {
     console.log('=== Processing Production Data ===');
@@ -974,7 +1017,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                 <p className="text-sm text-muted-foreground">
                   {hasUnsavedChanges
                     ? 'Unsaved filter changes'
-                    : `Showing ${totalRecords} filtered results`}
+                    : `Showing ${displayedRecords.length} filtered results`}
                 </p>
               )}
             </div>
@@ -1072,7 +1115,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       </div>
 
       {/* Machine cost from TC / VMC price per hr (applied when filters are used) */}
-      {filteredRecords.length > 0 && (
+      {displayedRecords.length > 0 && (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
             {!tcPricePerHr.trim() && !vmcPricePerHr.trim()
@@ -1179,7 +1222,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{filteredRecords.length}</div>
+              <div className="text-2xl font-bold">{displayedRecords.length}</div>
               <p className="text-xs text-muted-foreground">Filtered records</p>
             </CardContent>
           </Card>
@@ -1192,7 +1235,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
             <CardContent className="space-y-1">
               {(() => {
                 const qtyByMachine = (name: string) =>
-                  filteredRecords
+                  displayedRecords
                     .filter((r) => r.machineName === name)
                     .reduce((s, r) => s + (r.totalQty ?? r.qty ?? 0), 0);
                 const tc1 = qtyByMachine('TC-1');
@@ -1249,26 +1292,53 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
             </p>
             {!loading && (
               <p className="text-sm text-muted-foreground mt-1">
-                Showing {paginatedRecords.length} of {totalRecords} records
+                Showing {paginatedRecords.length} of {displayedRecords.length} records
                 {totalPages > 1 && ` (Page ${currentPage} of ${totalPages})`}
               </p>
             )}
           </div>
-          <Tabs
-            value={recordsView}
-            onValueChange={(value) => setRecordsView(value as 'cards' | 'table')}
-          >
-            <TabsList>
-              <TabsTrigger value="cards" className="gap-2">
-                <LayoutGrid className="h-4 w-4" />
-                Cards
-              </TabsTrigger>
-              <TabsTrigger value="table" className="gap-2">
-                <LayoutList className="h-4 w-4" />
-                Table
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                Filter current results:
+              </span>
+              <Select
+                value={tableJobOrderFilter}
+                onValueChange={(value) => {
+                  setTableJobOrderFilter(value);
+                  setCurrentPage(1);
+                }}
+                disabled={availableTableJobOrders.length === 0}
+              >
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="All Job Orders" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Job Orders</SelectItem>
+                  {availableTableJobOrders.map((jobOrder) => (
+                    <SelectItem key={jobOrder} value={jobOrder}>
+                      {jobOrder}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Tabs
+              value={recordsView}
+              onValueChange={(value) => setRecordsView(value as 'cards' | 'table')}
+            >
+              <TabsList>
+                <TabsTrigger value="cards" className="gap-2">
+                  <LayoutGrid className="h-4 w-4" />
+                  Cards
+                </TabsTrigger>
+                <TabsTrigger value="table" className="gap-2">
+                  <LayoutList className="h-4 w-4" />
+                  Table
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
 
         {loading ? (
