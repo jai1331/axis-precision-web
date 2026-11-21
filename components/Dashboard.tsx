@@ -54,6 +54,7 @@ import { DashboardSummary } from '@/types';
 import AnalyticsTab from './AnalyticsTab';
 import * as XLSX from 'xlsx';
 import { getEmployeeData, getCustomerList, formatDate, getTotalMachineHrs, getTotalIdleTime, getTotalWorkingHrs, addTimes } from '@/lib/utils';
+import { buildJobOrderSheet } from '@/lib/jobOrderSheet';
 import { getTodayDateString, isFutureDate } from '@/lib/formValidation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -480,6 +481,7 @@ export default function Dashboard() {
       
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Dashboard_Data');
+      XLSX.utils.book_append_sheet(workbook, buildJobOrderSheet(filteredData), 'Job Order');
       
       const fileName = `dashboard_production_data_${new Date().toISOString().slice(0, 10)}.xlsx`;
       XLSX.writeFile(workbook, fileName);

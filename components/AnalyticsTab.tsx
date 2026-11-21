@@ -55,6 +55,7 @@ import {
 import { ProductionRecord, ProductionFilters } from '@/types';
 import ProductionRecordModal from './ProductionRecordModal';
 import { addTimes, getEmployeeData, formatDate, getCustomerList } from '@/lib/utils';
+import { buildJobOrderSheet } from '@/lib/jobOrderSheet';
 import { getTodayDateString, isFutureDate } from '@/lib/formValidation';
 import moment from 'moment';
 import * as XLSX from 'xlsx';
@@ -707,6 +708,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
       
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Production_Records');
+      XLSX.utils.book_append_sheet(workbook, buildJobOrderSheet(filteredRecords), 'Job Order');
       
       const fileName = `production_records_${new Date().toISOString().slice(0, 10)}.xlsx`;
       XLSX.writeFile(workbook, fileName);
