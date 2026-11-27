@@ -25,6 +25,7 @@ type AdminInventoryEntry = {
   qty?: number;
   dcno?: string;
   internalJobOrder?: string;
+  poPrice?: number;
   supplierName?: string;
   rawMaterialPricePerKg?: number;
   materialGrade?: string;
@@ -39,6 +40,7 @@ type SortKey =
   | 'qty'
   | 'dcno'
   | 'internalJobOrder'
+  | 'poPrice'
   | 'supplierName'
   | 'materialGrade'
   | 'rawMaterialPricePerKg'
@@ -109,6 +111,7 @@ export default function AdminInventory() {
             entry.supplierName,
             entry.dcno,
             entry.internalJobOrder,
+            entry.poPrice,
             entry.materialGrade,
           ]
             .filter(Boolean)
@@ -129,6 +132,10 @@ export default function AdminInventory() {
         case 'rawMaterialPricePerKg':
           aVal = Number(a.rawMaterialPricePerKg) || 0;
           bVal = Number(b.rawMaterialPricePerKg) || 0;
+          break;
+        case 'poPrice':
+          aVal = Number(a.poPrice) || 0;
+          bVal = Number(b.poPrice) || 0;
           break;
         case 'rawMaterialCost':
           aVal = Number(a.rawMaterialCost) || 0;
@@ -161,7 +168,7 @@ export default function AdminInventory() {
       setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
-      setSortDir(key === 'addedOn' || key === 'qty' || key === 'rawMaterialCost' ? 'desc' : 'asc');
+      setSortDir(key === 'addedOn' || key === 'qty' || key === 'poPrice' || key === 'rawMaterialCost' ? 'desc' : 'asc');
     }
   };
 
@@ -251,6 +258,9 @@ export default function AdminInventory() {
               </SortableHead>
               <SortableHead column="dcno">DC No</SortableHead>
               <SortableHead column="internalJobOrder">Job Order</SortableHead>
+              <SortableHead column="poPrice" className="text-right">
+                PO Price
+              </SortableHead>
               <SortableHead column="supplierName">Supplier</SortableHead>
               <SortableHead column="materialGrade">Grade</SortableHead>
               <SortableHead column="rawMaterialPricePerKg" className="text-right">
@@ -266,7 +276,7 @@ export default function AdminInventory() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
                   No admin entries found
                 </TableCell>
               </TableRow>
@@ -284,6 +294,9 @@ export default function AdminInventory() {
                   <TableCell className="text-right">{(entry.qty ?? 0).toLocaleString()}</TableCell>
                   <TableCell>{entry.dcno || '—'}</TableCell>
                   <TableCell>{entry.internalJobOrder || '—'}</TableCell>
+                  <TableCell className="text-right">
+                    ₹{Number(entry.poPrice || 0).toFixed(2)}
+                  </TableCell>
                   <TableCell>{entry.supplierName || '—'}</TableCell>
                   <TableCell>{entry.materialGrade || '—'}</TableCell>
                   <TableCell className="text-right">

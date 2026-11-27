@@ -195,7 +195,7 @@ app.post('/api/register', async (req, res) => {
 })
 
 app.post('/api/saveAdminForm', async(req, res) => {
-	const { customerName, componentName, qty, dcno, internalJobOrder, supplierName, rawMaterialPricePerKg, materialGrade, rawMaterialCost } = req.body;
+	const { customerName, componentName, qty, dcno, internalJobOrder, poPrice, supplierName, rawMaterialPricePerKg, materialGrade, rawMaterialCost } = req.body;
 	console.log(req.body);
 	try {
 		const response = await adminEntryForm.create({
@@ -204,6 +204,7 @@ app.post('/api/saveAdminForm', async(req, res) => {
 			qty,
 			dcno,
 			internalJobOrder,
+			poPrice,
 			supplierName,
 			rawMaterialPricePerKg,
 			materialGrade,
@@ -330,6 +331,7 @@ app.put('/api/updateAdmitEntryForm', async(req, res) => {
 			qty: req.body.qty,
 			dcno: req.body.dcno,
 			internalJobOrder: req.body.internalJobOrder,
+			poPrice: req.body.poPrice,
 			supplierName: req.body.supplierName,
 			rawMaterialPricePerKg: req.body.rawMaterialPricePerKg,
 			materialGrade: req.body.materialGrade,

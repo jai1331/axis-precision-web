@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,12 +19,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  SearchableSelect,
+  type SearchableSelectOption,
+} from '@/components/ui/searchable-select';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, RefreshCw, Package, AlertCircle } from 'lucide-react';
 import {
@@ -42,6 +39,7 @@ import {
   scrollToFirstError,
 } from '@/lib/formValidation';
 import { DEFAULT_MACHINES, fetchMachines } from '@/lib/machines';
+import { findAdminEntryForRecord } from '@/lib/adminEntryMatching';
 
 const formSchema = z.object({
   operatorName: z.string().min(2, 'Operator name is required'),
@@ -73,6 +71,21 @@ type FormValues = z.infer<typeof formSchema>;
 
 const SHIFT_VALUES = ['First', 'Second', 'Third', '12hrMng', '12hrNight'] as const;
 const OPN_VALUES = ['preMC', 'first_opn', 'second_opn', 'third_opn', 'fourth_opn', 'R/W'] as const;
+const SHIFT_OPTIONS: SearchableSelectOption[] = [
+  { value: 'First', label: 'First - 8:00 AM TO 4:30 PM' },
+  { value: 'Second', label: 'Second - 4:30 PM TO 1:00 AM' },
+  { value: 'Third', label: 'Third - 1:00 AM TO 8:00 AM' },
+  { value: '12hrMng', label: '12hr Shift - 8:00 AM TO 8:00 PM' },
+  { value: '12hrNight', label: '12hr Shift - 8:00 PM TO 8:00 AM' },
+];
+const OPN_OPTIONS: SearchableSelectOption[] = [
+  { value: 'preMC', label: 'Pre M/C' },
+  { value: 'first_opn', label: 'First_opn' },
+  { value: 'second_opn', label: 'Second_opn' },
+  { value: 'third_opn', label: 'Third_opn' },
+  { value: 'fourth_opn', label: 'Fourth_opn' },
+  { value: 'R/W', label: 'R/W' },
+];
 
 const operatorsList = Array.from({ length: 100 }, (_, i) => {
   const num = i + 1;
@@ -212,6 +225,68 @@ export default function EmployeeEntryForm({
   const watchedCustomer = form.watch('customerName');
   const watchedComponent = form.watch('componentName');
   const watchedQty = form.watch('qty');
+  const customerOptions = useMemo(
+    () =>
+      [...new Set<string>(
+        customerAdminEntry
+          .map((entry: any) => String(entry.customerName ?? ''))
+          .filter((value: string) => value.trim()),
+      )]
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value, label: value })),
+    [customerAdminEntry],
+  );
+  const componentOptions = useMemo(
+    () =>
+      [...new Set<string>(
+        customerAdminEntry
+          .filter((entry: any) => entry.customerName === watchedCustomer)
+          .map((entry: any) => String(entry.componentName ?? ''))
+          .filter((value: string) => value.trim()),
+      )]
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value, label: value })),
+    [customerAdminEntry, watchedCustomer],
+  );
+  const jobOrderOptions = useMemo(
+    () =>
+      [...new Set<string>(
+        customerAdminEntry
+          .filter(
+            (entry: any) =>
+              entry.customerName === watchedCustomer &&
+              entry.componentName === watchedComponent &&
+              entry.internalJobOrder,
+          )
+          .map((entry: any) => String(entry.internalJobOrder))
+          .filter((value: string) => value.trim()),
+      )]
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value, label: value })),
+    [customerAdminEntry, watchedCustomer, watchedComponent],
+  );
+
+  useEffect(() => {
+    if (!customerAdminEntry.length || !watchedCustomer || !watchedComponent) return;
+
+    const currentJobOrder = form.getValues('internalJobOrder');
+    if (jobOrderOptions.some((option) => option.value === currentJobOrder)) return;
+
+    const nextJobOrder =
+      jobOrderOptions.length === 1 ? jobOrderOptions[0].value : '';
+    if (currentJobOrder !== nextJobOrder) {
+      form.setValue('internalJobOrder', nextJobOrder, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [
+    customerAdminEntry.length,
+    form,
+    jobOrderOptions,
+    watchedComponent,
+    watchedCustomer,
+  ]);
 
   useEffect(() => {
     if (!initialData?._id) return;
@@ -460,6 +535,15 @@ export default function EmployeeEntryForm({
         return;
       }
 
+      if (!findAdminEntryForRecord(customerAdminEntry, values)) {
+        toast({
+          title: 'Invalid Job Order',
+          description: 'Select a job order assigned to the selected customer and component.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       if (Object.keys(totalQtySave).length && totalQtySave.qty < parseInt(values.qty.toString())) {
         toast({
           title: 'Error',
@@ -609,6 +693,8 @@ export default function EmployeeEntryForm({
   const handleCustomerChange = (customerName: string) => {
     form.setValue('customerName', customerName);
     form.setValue('componentName', '');
+    form.setValue('internalJobOrder', '');
+    setTotalQty({});
   };
 
   const getAvailableQty = () => {
@@ -668,20 +754,19 @@ export default function EmployeeEntryForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Operator Name</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Select operator" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {operatorsList.map((operator) => (
-                          <SelectItem key={operator} value={operator}>
-                            {operator}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={operatorsList.map((operator) => ({
+                          value: operator,
+                          label: operator,
+                        }))}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select operator"
+                        searchPlaceholder="Search operators..."
+                        emptyMessage="No operators found."
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -712,20 +797,15 @@ export default function EmployeeEntryForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Shift</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Select shift" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="First">First - 8:00 AM TO 4:30 PM</SelectItem>
-                        <SelectItem value="Second">Second - 4:30 PM TO 1:00 AM</SelectItem>
-                        <SelectItem value="Third">Third - 1:00 AM TO 8:00 AM</SelectItem>
-                        <SelectItem value="12hrMng">12hr Shift - 8:00 AM TO 8:00 PM</SelectItem>
-                        <SelectItem value="12hrNight">12hr Shift - 8:00 PM TO 8:00 AM</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={SHIFT_OPTIONS}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select shift"
+                        searchPlaceholder="Search shifts..."
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -737,20 +817,18 @@ export default function EmployeeEntryForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Machine</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Select machine" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {machinesList.map((machine) => (
-                          <SelectItem key={machine} value={machine}>
-                            {machine}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={machinesList.map((machine) => ({
+                          value: machine,
+                          label: machine,
+                        }))}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select machine"
+                        searchPlaceholder="Search machines..."
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -762,20 +840,17 @@ export default function EmployeeEntryForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Customer Name</FormLabel>
-                    <Select onValueChange={handleCustomerChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Select customer" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {[...new Set(customerAdminEntry.map((item: any) => item.customerName))].map((customer: any) => (
-                          <SelectItem key={customer} value={customer}>
-                            {customer}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={customerOptions}
+                        value={field.value}
+                        onValueChange={handleCustomerChange}
+                        placeholder="Select customer"
+                        searchPlaceholder="Search customers..."
+                        emptyMessage="No customers found."
+                        disabled={customerOptions.length === 0}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -787,42 +862,26 @@ export default function EmployeeEntryForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Component Name</FormLabel>
-                    <Select 
-                      onValueChange={(value) => {
-                        try {
+                    <FormControl>
+                      <SearchableSelect
+                        options={componentOptions}
+                        value={field.value}
+                        onValueChange={(value) => {
                           field.onChange(value);
-                          if (value && watchedCustomer) {
-                            const componentEntry = customerAdminEntry.find(
-                              (entry: any) => entry.customerName === watchedCustomer && entry.componentName === value
-                            );
-                            if (componentEntry) {
-                              setTotalQty(componentEntry);
-                            }
-                          }
-                        } catch (error) {
-                          console.error('Error updating component:', error);
-                        }
-                      }} 
-                      value={field.value || undefined}
-                      disabled={!watchedCustomer || customerAdminEntry.filter((entry: any) => entry.customerName === watchedCustomer).length === 0}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder={!watchedCustomer ? "Select customer first" : "Select component"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {watchedCustomer && [...new Set(
-                          customerAdminEntry
-                            .filter((entry: any) => entry.customerName === watchedCustomer)
-                            .map((entry: any) => entry.componentName)
-                        )].map((componentName: string) => (
-                          <SelectItem key={componentName} value={componentName}>
-                            {componentName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          form.setValue('internalJobOrder', '');
+                          const componentEntry = customerAdminEntry.find(
+                            (entry: any) =>
+                              entry.customerName === watchedCustomer &&
+                              entry.componentName === value,
+                          );
+                          if (componentEntry) setTotalQty(componentEntry);
+                        }}
+                        placeholder={!watchedCustomer ? 'Select customer first' : 'Select component'}
+                        searchPlaceholder="Search components..."
+                        emptyMessage="No components found for this customer."
+                        disabled={!watchedCustomer || componentOptions.length === 0}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -914,21 +973,15 @@ export default function EmployeeEntryForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">OPN</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Select OPN" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="preMC">Pre M/C</SelectItem>
-                        <SelectItem value="first_opn">First_opn</SelectItem>
-                        <SelectItem value="second_opn">Second_opn</SelectItem>
-                        <SelectItem value="third_opn">Third_opn</SelectItem>
-                        <SelectItem value="fourth_opn">Fourth_opn</SelectItem>
-                        <SelectItem value="R/W">R/W</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={OPN_OPTIONS}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select OPN"
+                        searchPlaceholder="Search OPN..."
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -954,28 +1007,28 @@ export default function EmployeeEntryForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base font-semibold">Internal Job Order</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || undefined}
-                      disabled={!watchedCustomer || customerAdminEntry.length === 0}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder={!watchedCustomer ? "Select customer first" : "Select job order"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {[...new Set(
-                          customerAdminEntry
-                            .filter((entry: any) => entry.internalJobOrder)
-                            .map((entry: any) => entry.internalJobOrder)
-                        )].map((jobOrder: string) => (
-                          <SelectItem key={jobOrder} value={jobOrder}>
-                            {jobOrder}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <SearchableSelect
+                        options={jobOrderOptions}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder={
+                          !watchedCustomer
+                            ? 'Select customer first'
+                            : !watchedComponent
+                              ? 'Select component first'
+                              : 'Select job order'
+                        }
+                        searchPlaceholder="Search job orders..."
+                        emptyMessage="No job orders found for this customer/component."
+                        disabled={!watchedCustomer || !watchedComponent || jobOrderOptions.length === 0}
+                      />
+                    </FormControl>
+                    {watchedCustomer && watchedComponent && jobOrderOptions.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        No job orders are configured for this customer and component.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

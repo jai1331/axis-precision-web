@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { DashboardSummary } from '@/types';
 import AnalyticsTab from './AnalyticsTab';
+import { findAdminEntryForRecord } from '@/lib/adminEntryMatching';
 import * as XLSX from 'xlsx';
 import { getEmployeeData, getCustomerList, formatDate, getTotalMachineHrs, getTotalIdleTime, getTotalWorkingHrs, addTimes } from '@/lib/utils';
 import { buildJobOrderSheet } from '@/lib/jobOrderSheet';
@@ -134,6 +135,7 @@ export default function Dashboard() {
             shift: item.shift || 'Unknown',
             // Add admin entry data to production records
             supplierName: 'Unknown',
+            poPrice: 0,
             rawMaterialPricePerKg: 0,
             materialGrade: 'Unknown',
             rawMaterialCost: 0,
@@ -142,16 +144,13 @@ export default function Dashboard() {
           
           // Merge with admin entry data
           finalData = finalData.map((item: any) => {
-            const adminEntry = customerData.find((admin: any) => 
-              admin.customerName === item.customerName && 
-              admin.componentName === item.componentName &&
-              (admin.internalJobOrder === item.internalJobOrder || !item.internalJobOrder)
-            );
+            const adminEntry = findAdminEntryForRecord(customerData, item);
             
             if (adminEntry) {
               return {
                 ...item,
                 supplierName: adminEntry.supplierName || 'Unknown',
+                poPrice: Number(adminEntry.poPrice ?? 0),
                 rawMaterialPricePerKg: adminEntry.rawMaterialPricePerKg || 0,
                 materialGrade: adminEntry.materialGrade || 'Unknown',
                 rawMaterialCost: adminEntry.rawMaterialCost || 0,
@@ -423,6 +422,7 @@ export default function Dashboard() {
         'Component Name': item.componentName,
         'Customer Name': item.customerName,
         'Internal Job Order': item.internalJobOrder || '',
+        'PO Price': item.poPrice || 0,
         'Machine Name': item.machineName,
         'Operator Name': item.operatorName,
         'Shift': item.shift,
@@ -454,6 +454,7 @@ export default function Dashboard() {
         { wch: 25 }, // Component Name
         { wch: 20 }, // Customer Name
         { wch: 18 }, // Internal Job Order
+        { wch: 14 }, // PO Price
         { wch: 12 }, // Machine Name
         { wch: 15 }, // Operator Name
         { wch: 10 }, // Shift

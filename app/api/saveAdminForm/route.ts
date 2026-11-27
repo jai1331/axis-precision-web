@@ -24,6 +24,7 @@ const adminEntrySchema = new mongoose.Schema({
   qty: { type: Number, required: true },
   dcno: { type: String, required: true },
   internalJobOrder: { type: String, required: true },
+  poPrice: { type: Number, min: 0, default: 0 },
   supplierName: { type: String, required: true },
   rawMaterialPricePerKg: { type: Number, required: true },
   materialGrade: { type: String, required: true },
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
     console.log('Full request body:', JSON.stringify(body, null, 2));
     console.log('New fields check:', {
       supplierName: body.supplierName,
+      poPrice: body.poPrice,
       rawMaterialPricePerKg: body.rawMaterialPricePerKg,
       materialGrade: body.materialGrade,
       rawMaterialCost: body.rawMaterialCost
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
       qty: body.qty,
       dcno: body.dcno,
       internalJobOrder: body.internalJobOrder,
+      poPrice: body.poPrice,
       supplierName: body.supplierName,
       rawMaterialPricePerKg: body.rawMaterialPricePerKg,
       materialGrade: body.materialGrade,

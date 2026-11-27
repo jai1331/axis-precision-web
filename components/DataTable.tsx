@@ -53,7 +53,8 @@ import {
 } from 'lucide-react';
 import { AdminEntry } from '@/types';
 import * as XLSX from 'xlsx';
-import { getEmployeeData, formatDate } from '@/lib/utils';
+import { getEmployeeData, getCustomerList, formatDate } from '@/lib/utils';
+import { findAdminEntryForRecord } from '@/lib/adminEntryMatching';
 
 export default function DataTable() {
   const [entries, setEntries] = useState<AdminEntry[]>([]);
@@ -76,39 +77,59 @@ export default function DataTable() {
 
       // Fetch data from APIs - matches React Native exactly
       const employeeData = await getEmployeeData(formattedStartDate, formattedEndDate);
+      let customerData: any[] = [];
+      try {
+        const adminEntries = await getCustomerList();
+        if (!Array.isArray(adminEntries)) {
+          throw new Error('Admin entries response is not a list');
+        }
+        customerData = adminEntries;
+      } catch (error) {
+        console.error('Error fetching admin PO prices:', error);
+        toast({
+          title: 'Warning',
+          description: 'Production records loaded, but PO prices could not be fetched.',
+          variant: 'destructive',
+        });
+      }
 
       // Process employee data to match AdminEntry interface
-      const allEntries = employeeData.map((record: any) => ({
-        _id: record._id,
-        customerName: record.customerName || 'Unknown',
-        componentName: record.componentName || 'Unknown',
-        qty: record.qty || 0,
-        dcno: record.dcno || '',
-        internalJobOrder: record.internalJobOrder || '',
-        supplierName: record.supplierName || 'Unknown',
-        rawMaterialPricePerKg: record.rawMaterialPricePerKg || 0,
-        materialGrade: record.materialGrade || 'Unknown',
-        rawMaterialCost: record.rawMaterialCost || 0,
-        machineName: record.machineName || 'Unknown',
-        operatorName: record.operatorName || 'Unknown',
-        shift: record.shift || 'Day',
-        additionalQty: record.additionalQty || 0,
-        totalQty: record.totalQty || record.qty || 0,
-        opn: record.opn || '',
-        progNo: record.progNo || '',
-        settingTime: record.settingTime || 0,
-        cycleTime: record.cycleTime || 0,
-        handlingTime: record.handlingTime || 0,
-        idleTime: record.idleTime || 0,
-        startTime: new Date(record.startTime || record.dateOfEntry),
-        endTime: new Date(record.endTime || record.dateOfEntry),
-        totalProductionHr: record.totalProductionHr || 0,
-        totalWorkingHr: record.totalWorkingHr || 0,
-        remarks: record.remarks || '',
-        dateOfEntry: new Date(record.dateOfEntry || record.date),
-        createdAt: record.createdAt ? new Date(record.createdAt) : undefined,
-        updatedAt: record.updatedAt ? new Date(record.updatedAt) : undefined,
-      }));
+      const allEntries = employeeData.map((record: any) => {
+        const adminEntry = findAdminEntryForRecord(customerData, record);
+
+        return {
+          _id: record._id,
+          customerName: record.customerName || 'Unknown',
+          componentName: record.componentName || 'Unknown',
+          qty: record.qty || 0,
+          dcno: record.dcno || '',
+          internalJobOrder: record.internalJobOrder || '',
+          poPrice: Number(adminEntry?.poPrice) || 0,
+          supplierName: record.supplierName || 'Unknown',
+          rawMaterialPricePerKg: record.rawMaterialPricePerKg || 0,
+          materialGrade: record.materialGrade || 'Unknown',
+          rawMaterialCost: record.rawMaterialCost || 0,
+          machineName: record.machineName || 'Unknown',
+          operatorName: record.operatorName || 'Unknown',
+          shift: record.shift || 'Day',
+          additionalQty: record.additionalQty || 0,
+          totalQty: record.totalQty || record.qty || 0,
+          opn: record.opn || '',
+          progNo: record.progNo || '',
+          settingTime: record.settingTime || 0,
+          cycleTime: record.cycleTime || 0,
+          handlingTime: record.handlingTime || 0,
+          idleTime: record.idleTime || 0,
+          startTime: new Date(record.startTime || record.dateOfEntry),
+          endTime: new Date(record.endTime || record.dateOfEntry),
+          totalProductionHr: record.totalProductionHr || 0,
+          totalWorkingHr: record.totalWorkingHr || 0,
+          remarks: record.remarks || '',
+          dateOfEntry: new Date(record.dateOfEntry || record.date),
+          createdAt: record.createdAt ? new Date(record.createdAt) : undefined,
+          updatedAt: record.updatedAt ? new Date(record.updatedAt) : undefined,
+        };
+      });
 
       setEntries(allEntries);
     } catch (error) {
@@ -163,6 +184,7 @@ export default function DataTable() {
         'Component Name': entry.componentName,
         'Customer Name': entry.customerName,
         'Internal Job Order': entry.internalJobOrder || '',
+        'PO Price': entry.poPrice || 0,
         'DC Number': entry.dcno,
         'Supplier Name': entry.supplierName,
         'Material Grade': entry.materialGrade,
@@ -194,6 +216,7 @@ export default function DataTable() {
       { wch: 25 }, // Component Name
       { wch: 20 }, // Customer Name
       { wch: 18 }, // Internal Job Order
+      { wch: 14 }, // PO Price
       { wch: 12 }, // DC Number
       { wch: 20 }, // Supplier Name
       { wch: 15 }, // Material Grade
@@ -282,6 +305,7 @@ export default function DataTable() {
                   <TableHead>Operator</TableHead>
                   <TableHead>Shift</TableHead>
                   <TableHead>Qty</TableHead>
+                  <TableHead className="text-right">PO Price</TableHead>
                   <TableHead>DC No</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -291,7 +315,7 @@ export default function DataTable() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <TableRow key={index}>
-                      {Array.from({ length: 9 }).map((_, cellIndex) => (
+                      {Array.from({ length: 10 }).map((_, cellIndex) => (
                         <TableCell key={cellIndex}>
                           <Skeleton className="h-5 w-full" />
                         </TableCell>
@@ -331,6 +355,9 @@ export default function DataTable() {
                           </div>
                         </div>
                       </TableCell>
+                      <TableCell className="text-right">
+                        ₹{Number(entry.poPrice || 0).toFixed(2)}
+                      </TableCell>
                       <TableCell>{entry.dcno}</TableCell>
                       <TableCell>
                         {new Date(entry.dateOfEntry).toLocaleDateString()}
@@ -364,7 +391,7 @@ export default function DataTable() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                       No entries found
                     </TableCell>
                   </TableRow>

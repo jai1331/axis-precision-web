@@ -55,6 +55,7 @@ import {
 import { ProductionRecord, ProductionFilters } from '@/types';
 import ProductionRecordModal from './ProductionRecordModal';
 import { addTimes, getEmployeeData, formatDate, getCustomerList } from '@/lib/utils';
+import { findAdminEntryForRecord } from '@/lib/adminEntryMatching';
 import { buildJobOrderSheet } from '@/lib/jobOrderSheet';
 import { getTodayDateString, isFutureDate } from '@/lib/formValidation';
 import moment from 'moment';
@@ -202,19 +203,13 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     console.log('AnalyticsTab received productionData:', productionData);
     console.log('AnalyticsTab externalLoading:', externalLoading);
 
-    if(adminEntries.length === 0) { return; }
-
     if (productionData && productionData.length > 0) {
       console.log('Processing production data, length:', productionData.length);
 
       // Process production data to match ProductionRecord interface
       const allRecords = productionData.map((record: any) => {
         // Find matching admin entry for additional data
-        const adminEntry = adminEntries.find((admin: any) =>
-          (admin.customerName === record.customerName &&
-          admin.componentName === record.componentName) &&
-          (admin.internalJobOrder === record.internalJobOrder || !record.internalJobOrder) // Match job order if available, otherwise ignore
-        );
+        const adminEntry = findAdminEntryForRecord(adminEntries, record);
 
         return {
           _id: record._id || record.id,
@@ -241,6 +236,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
           createdAt: record.createdAt ? new Date(record.createdAt) : undefined,
           updatedAt: record.updatedAt ? new Date(record.updatedAt) : undefined,
           supplierName: adminEntry?.supplierName || 'Unknown',
+          poPrice: Number(adminEntry?.poPrice ?? 0),
           rawMaterialPricePerKg: adminEntry?.rawMaterialPricePerKg || 0,
           materialGrade: adminEntry?.materialGrade || 'Unknown',
           rawMaterialCost: adminEntry?.rawMaterialCost || 0,
@@ -666,7 +662,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
   const handleRecordUpdate = (updatedRecord: ProductionRecord) => {
     setRecords((prev) =>
       prev.map((record) =>
-        record._id === updatedRecord._id ? updatedRecord : record
+        record._id === updatedRecord._id
+          ? { ...updatedRecord, poPrice: record.poPrice }
+          : record
       )
     );
   };
@@ -700,6 +698,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         'Total Working Hr': record.totalWorkingHr || 0,
         'Supplier Name': record.supplierName || '',
         'Material Grade': record.materialGrade || '',
+        'PO Price': record.poPrice || 0,
         'Raw Material Price Per Kg': record.rawMaterialPricePerKg || 0,
         'Raw Material Cost': record.rawMaterialCost || 0,
         'Remarks': record.remarks || '',
@@ -731,6 +730,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
         { wch: 16 }, // Total Working Hr
         { wch: 20 }, // Supplier Name
         { wch: 15 }, // Material Grade
+        { wch: 14 }, // PO Price
         { wch: 22 }, // Raw Material Price Per Kg
         { wch: 18 }, // Raw Material Cost
         { wch: 30 }, // Remarks
@@ -796,37 +796,6 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
     setTotalPages(pages);
     setCurrentPage((prev) => Math.min(prev, pages));
   }, [recordsView, itemsPerPage, displayedRecords.length]);
-
-  useEffect(() => {
-    console.log('=== Processing Production Data ===');
-    console.log('Production data length:', productionData?.length);
-    
-    if (productionData && productionData.length > 0) {
-      const allRecords = productionData.map((record: any) => {
-        const adminEntry = adminEntries.find((admin: any) => 
-          admin.customerName === record.customerName && 
-          admin.componentName === record.componentName
-        );
-        
-        const internalJobOrder = adminEntry?.internalJobOrder || record.internalJobOrder || '';
-        
-        console.log('Processing record:', {
-          componentName: record.componentName,
-          internalJobOrder,
-          originalJobOrder: record.internalJobOrder,
-          adminJobOrder: adminEntry?.internalJobOrder
-        });
-
-        return {
-          ...record,
-          internalJobOrder,
-        };
-      });
-
-      console.log('Sample processed records:', allRecords.slice(0, 3));
-      setRecords(allRecords);
-    }
-  }, [productionData, adminEntries]);
 
   return (
     <div className="space-y-6">
@@ -1386,6 +1355,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                   <TableHead>Total Working Hr</TableHead>
                   <TableHead>Supplier Name</TableHead>
                   <TableHead>Material Grade</TableHead>
+                  <TableHead className="text-right">PO Price</TableHead>
                   <TableHead className="text-right">RM Price/kg</TableHead>
                   <TableHead className="text-right">RM Cost</TableHead>
                   <TableHead>Remarks</TableHead>
@@ -1394,7 +1364,7 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
               <TableBody>
                 {paginatedRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={25} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={26} className="h-24 text-center text-muted-foreground">
                       No production records found
                     </TableCell>
                   </TableRow>
@@ -1439,6 +1409,9 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                       <TableCell className="whitespace-nowrap">{record.totalWorkingHr || '—'}</TableCell>
                       <TableCell>{record.supplierName || '—'}</TableCell>
                       <TableCell>{record.materialGrade || '—'}</TableCell>
+                      <TableCell className="text-right">
+                        ₹{Number(record.poPrice || 0).toFixed(2)}
+                      </TableCell>
                       <TableCell className="text-right">
                         ₹{Number(record.rawMaterialPricePerKg || 0).toFixed(2)}
                       </TableCell>
@@ -1523,6 +1496,10 @@ export default function AnalyticsTab({ productionData = [], loading: externalLoa
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Material Grade</span>
                       <span className="text-xs font-medium">{record.materialGrade}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">PO Price</span>
+                      <span className="text-xs font-medium">₹{Number(record.poPrice || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Material Cost</span>

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     // Test the Render server with a simple request
@@ -9,6 +11,7 @@ export async function GET() {
       qty: 100,
       dcno: "TEST-DC-001",
       internalJobOrder: "TEST-JO-001",
+      poPrice: 0,
       supplierName: "Test Supplier",
       rawMaterialPricePerKg: 150.50,
       materialGrade: "Grade A",

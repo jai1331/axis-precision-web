@@ -36,6 +36,7 @@ export interface ProductionRecord {
   componentName: string;
   customerName: string;
   supplierName: string;
+  poPrice?: number;
   rawMaterialPricePerKg: number;
   materialGrade: string;
   rawMaterialCost: number;
@@ -69,6 +70,7 @@ export interface AdminEntry {
   qty: number;
   dcno: string;
   internalJobOrder?: string;
+  poPrice?: number;
   supplierName: string;
   rawMaterialPricePerKg: number;
   materialGrade: string;

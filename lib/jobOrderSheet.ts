@@ -64,6 +64,7 @@ export function buildJobOrderSheet(
     totalQty: Number(record.totalQty) || Number(record.qty) || 0,
     totalProductionHr: record.totalProductionHr,
     cycleTime: record.cycleTime,
+    poPrice: Number(record.poPrice) || 0,
     rawMaterialCost: Number(record.rawMaterialCost) || 0,
     materialGrade: record.materialGrade || '',
     supplierName: record.supplierName || '',
@@ -91,6 +92,7 @@ export function buildJobOrderSheet(
     'Internal Job Order',
     'Customer Name',
     'Component Name',
+    'PO Price',
     'Cycle Time',
     ...machines.map((machine) => `${machine} Production`),
     'Total Production Hours',
@@ -159,11 +161,14 @@ export function buildJobOrderSheet(
       machineCosts.reduce((sum, value) => sum + value, 0) + rawMaterialCost;
     const actualTotalCost =
       machineExpenses.reduce((sum, value) => sum + value, 0) + rawMaterialCost;
+    const poPrices = [...new Set(group.map((row) => row.poPrice).filter((price) => price > 0))];
+    const poPrice = poPrices.length > 1 ? poPrices.join(', ') : poPrices[0] || 0;
 
     sheetRows.push([
       jobOrder,
       [...new Set(group.map((row) => row.customerName).filter(Boolean))].join(', '),
       [...new Set(group.map((row) => row.componentName).filter(Boolean))].join(', '),
+      poPrice,
       sumCycleTimes(group),
       ...machineRows.map((rowsForMachine) => sumHours(rowsForMachine)),
       sumHours(group),
@@ -178,9 +183,9 @@ export function buildJobOrderSheet(
 
   const sheet = XLSX.utils.aoa_to_sheet(sheetRows);
   sheet['!cols'] = [
-    14, 28, 22, 16, 16, 16, 16, 16, 16, 20,
-    22, 24, 24, 24, 24, 24, 12, 16, 16, 20,
-    20, 20, 20, 20,
+    14, 28, 22, 14, 16, 16, 16, 16, 16, 16,
+    20, 22, 24, 24, 24, 24, 24, 12, 16, 16,
+    20, 20, 20, 20, 20,
   ].map((wch) => ({ wch }));
 
   const headerRow = 1;

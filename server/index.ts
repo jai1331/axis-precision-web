@@ -185,7 +185,7 @@ app.post('/api/change-password', async (req: Request, res: Response) => {
 
 // Save admin form endpoint
 app.post('/api/saveAdminForm', async (req: Request, res: Response) => {
-  const { customerName, componentName, qty, dcno, internalJobOrder, supplierName, rawMaterialPricePerKg, materialGrade, rawMaterialCost } = req.body;
+  const { customerName, componentName, qty, dcno, internalJobOrder, poPrice, supplierName, rawMaterialPricePerKg, materialGrade, rawMaterialCost } = req.body;
   console.log(req.body);
   
   try {
@@ -195,6 +195,7 @@ app.post('/api/saveAdminForm', async (req: Request, res: Response) => {
       qty,
       dcno,
       internalJobOrder,
+      poPrice,
       supplierName,
       rawMaterialPricePerKg,
       materialGrade,
@@ -325,6 +326,7 @@ app.put('/api/updateAdmitEntryForm', async (req: Request, res: Response) => {
       qty: req.body.qty,
       dcno: req.body.dcno,
       internalJobOrder: req.body.internalJobOrder,
+      poPrice: req.body.poPrice,
       supplierName: req.body.supplierName,
       rawMaterialPricePerKg: req.body.rawMaterialPricePerKg,
       materialGrade: req.body.materialGrade,

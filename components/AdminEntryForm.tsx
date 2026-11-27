@@ -42,6 +42,7 @@ const formSchema = z.object({
   qty: z.coerce.number().int().positive('Quantity must be positive'),
   dcno: z.string().min(1, 'DC number is required'),
   internalJobOrder: z.string().min(1, 'Internal Job Order is required'),
+  poPrice: z.coerce.number().nonnegative('PO price cannot be negative'),
   supplierName: z.string().min(2, 'Supplier name must be at least 2 characters'),
   rawMaterialPricePerKg: z.coerce.number().positive('Raw material price must be positive'),
   materialGrade: z.string().min(1, 'Material grade is required'),
@@ -77,6 +78,7 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
     qty: initialData?.qty || 0,
     dcno: initialData?.dcno || '',
     internalJobOrder: initialData?.internalJobOrder || '',
+    poPrice: initialData?.poPrice || 0,
     supplierName: initialData?.supplierName || '',
     rawMaterialPricePerKg: initialData?.rawMaterialPricePerKg || 0,
     materialGrade: initialData?.materialGrade || '',
@@ -100,6 +102,7 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
         qty: initialData.qty || 0,
         dcno: initialData.dcno || '',
         internalJobOrder: initialData.internalJobOrder || '',
+        poPrice: initialData.poPrice || 0,
         supplierName: initialData.supplierName || '',
         rawMaterialPricePerKg: initialData.rawMaterialPricePerKg || 0,
         materialGrade: initialData.materialGrade || '',
@@ -117,6 +120,7 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
       qty: 0,
       dcno: '',
       internalJobOrder: generateJobOrderNumber(entryCount),
+      poPrice: 0,
       supplierName: '',
       rawMaterialPricePerKg: 0,
       materialGrade: '',
@@ -544,6 +548,27 @@ export default function AdminEntryForm({ initialData }: AdminEntryFormProps = {}
                         Auto-generated as API-YY-MM-NNN. You can edit before saving.
                       </p>
                     )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="poPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">PO Price (₹)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="h-12"
+                        placeholder="Enter PO price"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

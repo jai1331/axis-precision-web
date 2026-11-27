@@ -30,6 +30,11 @@ const AdminEntrySchema: Schema = new Schema(
       trim: true,
       default: '',
     },
+    poPrice: {
+      type: Number,
+      min: [0, 'PO price cannot be negative'],
+      default: 0,
+    },
     supplierName: {
       type: String,
       required: [true, 'Supplier name is required'],

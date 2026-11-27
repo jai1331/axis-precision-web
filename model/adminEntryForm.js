@@ -7,6 +7,7 @@ const adminEntrySchema = new mongoose.Schema(
         qty: {  type: Number, required: true},
 		dcno: {  type: String, required: true},
 		internalJobOrder: { type: String, required: true },
+		poPrice: { type: Number, min: 0, default: 0 },
 		supplierName: { type: String, required: true },
 		rawMaterialPricePerKg: { type: Number, required: true },
 		materialGrade: { type: String, required: true },

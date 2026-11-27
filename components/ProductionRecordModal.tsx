@@ -606,6 +606,10 @@ export default function ProductionRecordModal({
                 <p className="text-sm font-semibold">{record.totalQty}</p>
               </div>
               <div>
+                <label className="text-sm font-medium text-muted-foreground">PO Price</label>
+                <p className="text-sm font-semibold">₹{Number(record.poPrice || 0).toFixed(2)}</p>
+              </div>
+              <div>
                 <label className="text-sm font-medium text-muted-foreground">OPN</label>
                 <p className="text-sm">{record.opn}</p>
               </div>
